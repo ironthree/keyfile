@@ -16,6 +16,11 @@ fn parse_all() {
         }
 
         println!("Checking {}", path.display());
-        dotdesktop::DesktopFile::from_path(path);
+
+        let contents = std::fs::read_to_string(path).unwrap();
+        let parsed = dotdesktop::ParsedFile::parse(contents.as_str()).unwrap();
+        let written = parsed.to_string();
+
+        assert_eq!(written, contents);
     }
 }

@@ -1,4 +1,4 @@
-use dotdesktop::DesktopFile;
+use dotdesktop::ParsedFile;
 
 use std::env::args;
 
@@ -7,6 +7,8 @@ fn main() {
     paths.next();
 
     for path in paths {
-        println!("{:#?}", DesktopFile::from_path(path));
+        let contents = std::fs::read_to_string(path).unwrap();
+        let parsed = ParsedFile::parse(contents.as_str()).unwrap();
+        println!("{:#?}", parsed);
     }
 }

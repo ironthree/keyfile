@@ -15,10 +15,15 @@ exclude = ["/tests/", "/.github/", "/rustfmt.toml"]
 #repository = "https://github.com/ironthree/dotdesktop"
 
 [dependencies]
+indexmap = "2"
 once_cell = "1"
 regex = "1"
-self_cell = "1"
+#self_cell = "1"
 thiserror = "1"
 
 [dev-dependencies]
 glob = "0.3"
+
+[profile.release]
+codegen-units = 1
+lto = true
