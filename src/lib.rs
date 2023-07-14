@@ -1,3 +1,6 @@
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::panic)]
+
 use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
@@ -10,7 +13,7 @@ static HEADER: Lazy<Regex> = Lazy::new(|| {
     // - opening "[",
     // - printable ASCII characters except "[" and "]",
     // - closing "]"
-    Regex::new(r"^\[(?<name>[[:print:][^\[\]]]+)\]$").unwrap()
+    Regex::new(r"^\[(?<name>[[:print:][^\[\]]]+)\]$").expect("Failed to compile hard-coded regular expression.")
 });
 
 // TODO: document that encoding modifier is not supported since only UTF-8-only files are supported
@@ -22,11 +25,33 @@ static KEY_VALUE_PAIR: Lazy<Regex> = Lazy::new(|| {
     // - "=" character,
     // - optional whitespace,
     // - value (printable ASCII or UTF-8)
-    Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$").unwrap()
+    Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$")
+        .expect("Failed to compile hard-coded regular expression.")
 });
 
 #[derive(Debug, Error)]
-pub enum DesktopError {}
+pub enum DesktopError<'a> {
+    #[error("Invalid line (line {}): {}", .lineno, .line)]
+    InvalidLine { line: &'a str, lineno: usize },
+    #[error("Multiple groups with the same name (line {}): {}", .lineno, .name)]
+    DuplicateGroup { name: &'a str, lineno: usize },
+    #[error("Multiple key-value pairs with the same key (line {}): {}", .lineno, .key)]
+    DuplicateKey { key: String, lineno: usize },
+}
+
+impl<'a> DesktopError<'a> {
+    fn invalid_line(line: &'a str, lineno: usize) -> Self {
+        DesktopError::InvalidLine { line, lineno }
+    }
+
+    fn duplicate_group(name: &'a str, lineno: usize) -> Self {
+        DesktopError::DuplicateGroup { name, lineno }
+    }
+
+    fn duplicate_key(key: String, lineno: usize) -> Self {
+        DesktopError::DuplicateKey { key, lineno }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 struct KeyValuePair<'a> {
@@ -158,23 +183,19 @@ impl<'a> ParsedFile<'a> {
             // - lines that begin with a "#" character are comments
             if line.is_empty() || line.starts_with('#') {
                 decor.push(line);
-            // lines that start with "[" are either group headers or invalid
-            } else if line.starts_with('[') {
-                if let Some(header) = parse_as_header(line) {
-                    if let Some(collector) = current_group.take() {
-                        let name = collector.name;
-                        let existing = groups.insert(name, collector);
 
-                        if existing.is_some() {
-                            panic!("Duplicate group: {} (line {})", name, lineno);
-                        }
-                    }
-
-                    current_group = Some(Group::new(header, IndexMap::new(), std::mem::take(&mut decor)));
-                } else {
-                    panic!("Invalid line: {} (line {})", line, lineno);
+            // attempt to parse line as group header
+            } else if let Some(header) = parse_as_header(line) {
+                if groups.contains_key(header) {
+                    return Err(DesktopError::duplicate_group(header, lineno));
                 }
-            // non-empty lines that start with neither "#" nor "[" are either key-value-pairs or invalid
+                if let Some(collector) = current_group.take() {
+                    groups.insert(collector.name, collector);
+                    // already checked if there was a previous group with this name
+                }
+                current_group = Some(Group::new(header, IndexMap::new(), std::mem::take(&mut decor)));
+
+            // attempt to parse line as key-value-pair
             } else if let Some((key, locale, value, wsl, wsr)) = parse_as_key_value_pair(line) {
                 if let Some(collector) = &mut current_group {
                     let key_str = if let Some(ref locale) = locale {
@@ -185,21 +206,19 @@ impl<'a> ParsedFile<'a> {
 
                     let kv = KeyValuePair::new(key, locale, value, wsl, wsr, std::mem::take(&mut decor));
                     if let Some(_previous) = collector.entries.insert((key, locale), kv) {
-                        panic!("Duplicate key-value pair: {} (line {})", key_str, lineno);
+                        return Err(DesktopError::duplicate_key(key_str, lineno));
                     }
                 }
+
+            // line is invalid if it is neither empty, nor a comment, nor a group header, nor a key-value-pair
             } else {
-                panic!("Invalid line: {} (line {})", line, lineno);
+                return Err(DesktopError::invalid_line(line, lineno));
             }
         }
 
         if let Some(collector) = current_group.take() {
-            let name = collector.name;
-            let existing = groups.insert(name, collector);
-
-            if existing.is_some() {
-                panic!("Duplicate group: {}", name);
-            }
+            groups.insert(collector.name, collector);
+            // already checked if there was a previous group with this name
         }
 
         Ok(ParsedFile { groups, decor })
