@@ -1,5 +1,7 @@
 use glob::glob;
 
+use dotdesktop::BasicFile;
+
 #[test]
 fn parse_all() {
     let files = glob("/usr/share/applications/*.desktop").unwrap();
@@ -18,7 +20,7 @@ fn parse_all() {
         println!("Checking {}", path.display());
 
         let contents = std::fs::read_to_string(path).unwrap();
-        let parsed = dotdesktop::ParsedFile::parse(contents.as_str()).unwrap();
+        let parsed = BasicFile::from_contents(contents.as_str().into()).unwrap();
         let written = parsed.to_string();
 
         assert_eq!(written, contents);
