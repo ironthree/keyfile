@@ -1,4 +1,4 @@
-use dotdesktop::BasicFile;
+use dotdesktop::KeyFile;
 
 use std::env::args;
 
@@ -8,7 +8,7 @@ fn main() {
 
     for path in paths {
         let contents = std::fs::read_to_string(path).unwrap();
-        let parsed = BasicFile::from_contents(contents.as_str().into()).unwrap();
+        let parsed = KeyFile::parse(contents.as_str()).unwrap();
         println!("{:#?}", parsed);
     }
 }

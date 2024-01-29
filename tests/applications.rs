@@ -1,6 +1,6 @@
 use glob::glob;
 
-use dotdesktop::BasicFile;
+use dotdesktop::KeyFile;
 
 #[test]
 fn parse_all() {
@@ -20,7 +20,7 @@ fn parse_all() {
         println!("Checking {}", path.display());
 
         let contents = std::fs::read_to_string(path).unwrap();
-        let parsed = BasicFile::from_contents(contents.as_str().into()).unwrap();
+        let parsed = KeyFile::parse(contents.as_str()).unwrap();
         let written = parsed.to_string();
 
         assert_eq!(written, contents);
