@@ -6,12 +6,12 @@ use indexmap::IndexMap;
 use crate::basic::{Group, KeyValuePair};
 use crate::error::KeyFileError;
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
-use crate::validate::{Key, Value, Whitespace};
+use crate::validate::{Decor, Key, Value, Whitespace};
 
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
     pub(crate) groups: IndexMap<Cow<'a, str>, Group<'a>>,
-    pub(crate) decor: Vec<&'a str>,
+    pub(crate) decor: Vec<Cow<'a, str>>,
 }
 
 impl<'a> KeyFile<'a> {
@@ -32,7 +32,7 @@ impl<'a> KeyFile<'a> {
             // - empty lines are not meaningful
             // - lines that begin with a "#" character are comments
             if line.is_empty() || line.starts_with('#') {
-                decor.push(line);
+                decor.push(Cow::Borrowed(line));
 
             // attempt to parse line as group header
             } else if let Some(header) = parse_as_header(line) {
@@ -47,7 +47,7 @@ impl<'a> KeyFile<'a> {
                 current_group = Some(Group::from_entries_borrowed(
                     header,
                     IndexMap::new(),
-                    std::mem::take(&mut decor),
+                    Decor::new_unchecked(std::mem::take(&mut decor)),
                 ));
 
             // attempt to parse line as key-value-pair
@@ -66,7 +66,7 @@ impl<'a> KeyFile<'a> {
                         Value::new_unchecked(value.into()),
                         Whitespace::new_unchecked(wsl.into()),
                         Whitespace::new_unchecked(wsr.into()),
-                        std::mem::take(&mut decor),
+                        Decor::new_unchecked(std::mem::take(&mut decor)),
                     );
                     if let Some(_previous) = collector.entries.insert((key.into(), locale), kv) {
                         return Err(KeyFileError::duplicate_key(key_str, lineno));

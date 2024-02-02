@@ -7,7 +7,7 @@ fn main() {
         "Test".try_into().unwrap(),
         "\t".try_into().unwrap(),
         "\t".try_into().unwrap(),
-        vec!["# This is a Test Name"],
+        vec!["# This is a Test Name"].try_into().unwrap(),
     );
     let kv2 = KeyValuePair::new_borrowed("Version".try_into().unwrap(), None, "1.5".try_into().unwrap());
 

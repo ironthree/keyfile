@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
 
-use crate::validate::{Key, Value, Whitespace};
+use crate::validate::{Decor, Key, Value, Whitespace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -38,14 +38,13 @@ impl<'a> KeyValuePair<'a> {
         }
     }
 
-    // TODO: validate input
     pub fn new_with_decor(
         key: Key<'static>,
         locale: Option<Locale<'static>>,
         value: Value<'static>,
         wsl: Whitespace<'static>,
         wsr: Whitespace<'static>,
-        decor: Vec<String>,
+        decor: Decor<'static>,
     ) -> Self {
         KeyValuePair {
             key: key.into(),
@@ -53,18 +52,17 @@ impl<'a> KeyValuePair<'a> {
             value: value.into(),
             wsl: wsl.into(),
             wsr: wsr.into(),
-            decor: decor.into_iter().map(Cow::Owned).collect(),
+            decor: decor.into(),
         }
     }
 
-    // TODO: validate input
     pub fn new_with_decor_borrowed<'kv: 'a>(
         key: Key<'kv>,
         locale: Option<Locale<'kv>>,
         value: Value<'kv>,
         wsl: Whitespace<'kv>,
         wsr: Whitespace<'kv>,
-        decor: Vec<&'kv str>,
+        decor: Decor<'kv>,
     ) -> Self {
         KeyValuePair {
             key: key.into(),
@@ -72,7 +70,7 @@ impl<'a> KeyValuePair<'a> {
             value: value.into(),
             wsl: wsl.into(),
             wsr: wsr.into(),
-            decor: decor.iter().map(|s| Cow::Borrowed(*s)).collect(),
+            decor: decor.into(),
         }
     }
 
@@ -294,24 +292,24 @@ impl<'a> Group<'a> {
     pub(crate) fn from_entries(
         name: String,
         entries: IndexMap<(Cow<'static, str>, Option<Locale<'static>>), KeyValuePair<'static>>,
-        decor: Vec<String>,
+        decor: Decor<'static>,
     ) -> Self {
         Group {
             name: name.into(),
             entries,
-            decor: decor.into_iter().map(Cow::Owned).collect(),
+            decor: decor.into(),
         }
     }
 
     pub(crate) fn from_entries_borrowed<'e: 'a>(
         name: &'e str,
         entries: IndexMap<(Cow<'e, str>, Option<Locale<'e>>), KeyValuePair<'e>>,
-        decor: Vec<&'e str>,
+        decor: Decor<'e>,
     ) -> Self {
         Group {
             name: name.into(),
             entries,
-            decor: decor.iter().map(|s| Cow::Borrowed(*s)).collect(),
+            decor: decor.into(),
         }
     }
 

@@ -175,3 +175,56 @@ impl<'a> TryFrom<String> for Whitespace<'a> {
         Whitespace::try_from(Cow::Owned(value))
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct Decor<'a> {
+    inner: Vec<Cow<'a, str>>,
+}
+
+impl<'a> Decor<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Vec<Cow<'a, str>>) -> Self {
+        Decor { inner: value }
+    }
+}
+
+impl<'a> From<Decor<'a>> for Vec<Cow<'a, str>> {
+    #[inline(always)]
+    fn from(value: Decor<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Decor: decor must be either empty lines or lines that start with the '#' character")]
+pub struct InvalidDecor;
+
+impl<'a> TryFrom<Vec<Cow<'a, str>>> for Decor<'a> {
+    type Error = InvalidDecor;
+
+    fn try_from(value: Vec<Cow<'a, str>>) -> Result<Self, Self::Error> {
+        for line in &value {
+            if !line.is_empty() && !line.starts_with('#') {
+                return Err(InvalidDecor);
+            }
+        }
+
+        Ok(Decor { inner: value })
+    }
+}
+
+impl<'a> TryFrom<Vec<&'a str>> for Decor<'a> {
+    type Error = InvalidDecor;
+
+    fn try_from(value: Vec<&'a str>) -> Result<Self, Self::Error> {
+        Decor::try_from(value.into_iter().map(Cow::Borrowed).collect::<Vec<_>>())
+    }
+}
+
+impl<'a> TryFrom<Vec<String>> for Decor<'a> {
+    type Error = InvalidDecor;
+
+    fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
+        Decor::try_from(value.into_iter().map(Cow::Owned).collect::<Vec<_>>())
+    }
+}
