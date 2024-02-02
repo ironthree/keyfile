@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::basic::Locale;
+use crate::validate::{Country, Language};
 
 static HEADER: Lazy<Regex> = Lazy::new(|| {
     // group header:
@@ -43,7 +44,13 @@ pub fn parse_as_key_value_pair(line: &str) -> Option<(&str, Option<Locale>, &str
     let wsl = caps.name("wsl")?.as_str();
     let wsr = caps.name("wsr")?.as_str();
 
-    let locale = lang.map(|lang| Locale::new_borrowed(lang, country, modifier));
+    let locale = lang.map(|lang| {
+        Locale::new_borrowed(
+            Language::new_unchecked(lang.into()),
+            country.map(|c| Country::new_unchecked(c.into())),
+            modifier,
+        )
+    });
     Some((key, locale, value, wsl, wsr))
 }
 
@@ -71,13 +78,23 @@ mod tests {
         );
         assert_eq!(
             parse_as_key_value_pair("Name[de] =Dateien").unwrap(),
-            ("Name", Some(Locale::new_borrowed("de", None, None)), "Dateien", " ", ""),
+            (
+                "Name",
+                Some(Locale::new_borrowed("de".try_into().unwrap(), None, None)),
+                "Dateien",
+                " ",
+                ""
+            ),
         );
         assert_eq!(
             parse_as_key_value_pair("Name[en_GB] = Files").unwrap(),
             (
                 "Name",
-                Some(Locale::new_borrowed("en", Some("GB"), None)),
+                Some(Locale::new_borrowed(
+                    "en".try_into().unwrap(),
+                    Some("GB".try_into().unwrap()),
+                    None
+                )),
                 "Files",
                 " ",
                 " "
@@ -87,7 +104,7 @@ mod tests {
             parse_as_key_value_pair("Name[sr@latin]= Datoteke").unwrap(),
             (
                 "Name",
-                Some(Locale::new_borrowed("sr", None, Some("latin"))),
+                Some(Locale::new_borrowed("sr".try_into().unwrap(), None, Some("latin"))),
                 "Datoteke",
                 "",
                 " "

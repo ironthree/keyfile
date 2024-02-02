@@ -44,7 +44,7 @@ impl<'a> KeyFile<'a> {
                     groups.insert(collector.name.clone(), collector);
                     // already checked if there was a previous group with this name
                 }
-                current_group = Some(Group::from_entries_borrowed(
+                current_group = Some(Group::from_entries(
                     GroupName::new_unchecked(header.into()),
                     IndexMap::new(),
                     Decor::new_unchecked(std::mem::take(&mut decor)),
@@ -59,7 +59,7 @@ impl<'a> KeyFile<'a> {
                         key.to_string()
                     };
 
-                    let kv = KeyValuePair::new_with_decor_borrowed(
+                    let kv = KeyValuePair::new_with_decor(
                         Key::new_unchecked(key.into()),
                         // this clone is cheap since locale contains only Cow::Borrowed
                         locale.clone(),

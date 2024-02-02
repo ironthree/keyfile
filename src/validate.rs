@@ -1,6 +1,36 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
+    // keep in sync with src/parse.rs:HEADER
+    Regex::new(r"^[[:print:][^\[\]]]+$").expect("Failed to compile hard-coded regular expression.")
+});
+
+static LANGUAGE: Lazy<Regex> = Lazy::new(|| {
+    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
+    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+});
+
+static COUNTRY: Lazy<Regex> = Lazy::new(|| {
+    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
+    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+});
+
+static ENCODING: Lazy<Regex> = Lazy::new(|| {
+    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
+    Regex::new(r"^[[:alnum:]-]+$").expect("Failed to compile hard-coded regular expression.")
+});
+
+static MODIFIER: Lazy<Regex> = Lazy::new(|| {
+    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
+    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+});
+
+// =============================================================================
+
 #[derive(Clone, Debug)]
 pub struct GroupName<'a> {
     inner: Cow<'a, str>,
@@ -27,16 +57,8 @@ impl<'a> TryFrom<Cow<'a, str>> for GroupName<'a> {
     type Error = InvalidGroupName;
 
     fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if !c.is_ascii() {
-                return Err(InvalidGroupName);
-            }
-            if c.is_ascii_control() {
-                return Err(InvalidGroupName);
-            }
-            if c == '[' || c == ']' {
-                return Err(InvalidGroupName);
-            }
+        if !GROUPNAME.is_match(&value) {
+            return Err(InvalidGroupName);
         }
 
         Ok(GroupName { inner: value })
@@ -60,6 +82,8 @@ impl<'a> TryFrom<String> for GroupName<'a> {
         GroupName::try_from(Cow::Owned(value))
     }
 }
+
+// =============================================================================
 
 #[derive(Clone, Debug)]
 pub struct Key<'a> {
@@ -123,6 +147,116 @@ impl<'a> TryFrom<String> for Key<'a> {
     }
 }
 
+// =============================================================================
+
+#[derive(Clone, Debug)]
+pub struct Language<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Language<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Language { inner: value }
+    }
+}
+
+impl<'a> From<Language<'a>> for Cow<'a, str> {
+    fn from(value: Language<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Language: language names may only contain printable ASCII")]
+pub struct InvalidLanguage;
+
+impl<'a> TryFrom<Cow<'a, str>> for Language<'a> {
+    type Error = InvalidLanguage;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !LANGUAGE.is_match(&value) {
+            return Err(InvalidLanguage);
+        }
+
+        Ok(Language { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Language<'a> {
+    type Error = InvalidLanguage;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Language::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Language<'a> {
+    type Error = InvalidLanguage;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Language::try_from(Cow::Owned(value))
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug)]
+pub struct Country<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Country<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Country { inner: value }
+    }
+}
+
+impl<'a> From<Country<'a>> for Cow<'a, str> {
+    fn from(value: Country<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Country: country names may only contain printable ASCII")]
+pub struct InvalidCountry;
+
+impl<'a> TryFrom<Cow<'a, str>> for Country<'a> {
+    type Error = InvalidCountry;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !COUNTRY.is_match(&value) {
+            return Err(InvalidCountry);
+        }
+
+        Ok(Country { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Country<'a> {
+    type Error = InvalidCountry;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Country::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Country<'a> {
+    type Error = InvalidCountry;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Country::try_from(Cow::Owned(value))
+    }
+}
+
+// =============================================================================
+
 #[derive(Clone, Debug)]
 pub struct Value<'a> {
     inner: Cow<'a, str>,
@@ -183,6 +317,8 @@ impl<'a> TryFrom<String> for Value<'a> {
     }
 }
 
+// =============================================================================
+
 #[derive(Clone, Debug)]
 pub struct Whitespace<'a> {
     inner: Cow<'a, str>,
@@ -235,6 +371,8 @@ impl<'a> TryFrom<String> for Whitespace<'a> {
         Whitespace::try_from(Cow::Owned(value))
     }
 }
+
+// =============================================================================
 
 #[derive(Clone, Debug)]
 pub struct Decor<'a> {
