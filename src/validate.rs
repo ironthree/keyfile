@@ -62,3 +62,63 @@ impl<'a> TryFrom<String> for Key<'a> {
         Key::try_from(Cow::Owned(value))
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct Value<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Value<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Value { inner: value }
+    }
+}
+
+impl<'a> From<Value<'a>> for Cow<'a, str> {
+    #[inline(always)]
+    fn from(value: Value<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidValue {
+    #[error("Invalid Value: values cannot contain control characters")]
+    ContainsControlCharacter,
+    #[error("Invalid Value: values cannot span multiple lines")]
+    ContainsNewline,
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Value<'a> {
+    type Error = InvalidValue;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        for c in value.chars() {
+            if c.is_control() {
+                return Err(InvalidValue::ContainsControlCharacter);
+            }
+            if c == '\n' || c == '\r' {
+                return Err(InvalidValue::ContainsNewline);
+            }
+        }
+
+        Ok(Value { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Value<'a> {
+    type Error = InvalidValue;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Value::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Value<'a> {
+    type Error = InvalidValue;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Value::try_from(Cow::Owned(value))
+    }
+}

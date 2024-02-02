@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
 
-use crate::validate::Key;
+use crate::validate::{Key, Value};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -16,8 +16,7 @@ pub struct KeyValuePair<'a> {
 }
 
 impl<'a> KeyValuePair<'a> {
-    // TODO: validate input
-    pub fn new(key: Key<'static>, locale: Option<Locale<'static>>, value: String) -> Self {
+    pub fn new(key: Key<'static>, locale: Option<Locale<'static>>, value: Value<'static>) -> Self {
         KeyValuePair {
             key: key.into(),
             locale,
@@ -28,8 +27,7 @@ impl<'a> KeyValuePair<'a> {
         }
     }
 
-    // TODO: validate input
-    pub fn new_borrowed<'kv: 'a>(key: Key<'kv>, locale: Option<Locale<'kv>>, value: &'kv str) -> Self {
+    pub fn new_borrowed<'kv: 'a>(key: Key<'kv>, locale: Option<Locale<'kv>>, value: Value<'kv>) -> Self {
         KeyValuePair {
             key: key.into(),
             locale,
@@ -44,7 +42,7 @@ impl<'a> KeyValuePair<'a> {
     pub fn new_with_decor(
         key: Key<'static>,
         locale: Option<Locale<'static>>,
-        value: String,
+        value: Value<'static>,
         wsl: String,
         wsr: String,
         decor: Vec<String>,
@@ -63,7 +61,7 @@ impl<'a> KeyValuePair<'a> {
     pub fn new_with_decor_borrowed<'kv: 'a>(
         key: Key<'kv>,
         locale: Option<Locale<'kv>>,
-        value: &'kv str,
+        value: Value<'kv>,
         wsl: &'kv str,
         wsr: &'kv str,
         decor: Vec<&'kv str>,
