@@ -1,6 +1,6 @@
 use glob::glob;
 
-use dotdesktop::KeyFile;
+use keyfile::KeyFile;
 
 #[test]
 fn parse_all() {

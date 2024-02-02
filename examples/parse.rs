@@ -1,4 +1,4 @@
-use dotdesktop::KeyFile;
+use keyfile::KeyFile;
 
 use std::env::args;
 

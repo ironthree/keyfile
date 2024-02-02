@@ -1,6 +1,6 @@
 [package]
-name = "dotdesktop"
-description = "Tools and parser for XDG Desktop Entry files (\".desktop\" files)"
+name = "keyfile"
+description = "Parse and write files in glib2's Keyfile format (like \".desktop\" files)"
 license = "MIT OR Apache-2.0"
 
 version = "0.1.0-dev"
@@ -12,7 +12,7 @@ readme = "README.md"
 exclude = ["/tests/", "/.github/", "/rustfmt.toml"]
 #categories = []
 #keywords = []
-#repository = "https://github.com/ironthree/dotdesktop"
+#repository = "https://github.com/ironthree/keyfile"
 
 [dependencies]
 indexmap = "2"
