@@ -39,6 +39,7 @@ impl<'a> KeyFile<'a> {
                     return Err(KeyFileError::duplicate_group(String::from(header), lineno));
                 }
                 if let Some(collector) = current_group.take() {
+                    // this clone is cheap since collector.name is always a Cow::Borrowed
                     groups.insert(collector.name.clone(), collector);
                     // already checked if there was a previous group with this name
                 }
@@ -59,6 +60,7 @@ impl<'a> KeyFile<'a> {
 
                     let kv = KeyValuePair::new_with_decor_borrowed(
                         key,
+                        // this clone is cheap since locale contains only Cow::Borrowed
                         locale.clone(),
                         value,
                         wsl,
@@ -77,6 +79,7 @@ impl<'a> KeyFile<'a> {
         }
 
         if let Some(collector) = current_group.take() {
+            // this clone is cheap since collector.name is always a Cow::Borrowed
             groups.insert(collector.name.clone(), collector);
             // already checked if there was a previous group with this name
         }
@@ -93,6 +96,8 @@ impl<'a> KeyFile<'a> {
     }
 
     pub fn insert_group<'g: 'a>(&mut self, group: Group<'g>) -> Option<Group> {
+        // This clone is cheap only if the group.name is a Cow::Borrowed(&str).
+        // If group.name is a Cow::Owned(String), the String needs to be copied.
         self.groups.insert(group.name.clone(), group)
     }
 

@@ -324,6 +324,8 @@ impl<'a> Group<'a> {
     }
 
     pub fn insert<'kv: 'a>(&mut self, kv: KeyValuePair<'kv>) -> Option<KeyValuePair> {
+        // This clone is cheap only if the kv.key is a Cow::Borrowed(&str).
+        // If kv.key is a Cow::Owned(String), the String needs to be copied.
         self.entries.insert((kv.key.clone(), kv.locale.clone()), kv)
     }
 
