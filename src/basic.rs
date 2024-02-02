@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
 
-use crate::validate::{Decor, Key, Value, Whitespace};
+use crate::validate::{Decor, GroupName, Key, Value, Whitespace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -78,15 +78,12 @@ impl<'a> KeyValuePair<'a> {
         &self.key
     }
 
-    // TODO: validate input
-    pub fn set_key(&mut self, key: String) -> Cow<str> {
-        let new = Cow::Owned(key);
-        std::mem::replace(&mut self.key, new)
+    pub fn set_key(&mut self, key: Key<'static>) -> Cow<str> {
+        std::mem::replace(&mut self.key, key.into())
     }
 
-    pub fn set_key_borrowed<'k: 'a>(&mut self, key: &'k str) -> Cow<str> {
-        let new = Cow::Borrowed(key);
-        std::mem::replace(&mut self.key, new)
+    pub fn set_key_borrowed<'k: 'a>(&mut self, key: Key<'k>) -> Cow<str> {
+        std::mem::replace(&mut self.key, key.into())
     }
 
     pub fn get_locale(&self) -> Option<&Locale> {
@@ -94,48 +91,40 @@ impl<'a> KeyValuePair<'a> {
     }
 
     pub fn set_locale(&mut self, locale: Locale<'static>) -> Option<Locale<'a>> {
-        let new = Some(locale);
-        std::mem::replace(&mut self.locale, new)
+        std::mem::replace(&mut self.locale, Some(locale))
     }
 
     pub fn set_locale_borrowed<'l: 'a>(&mut self, locale: Locale<'l>) -> Option<Locale<'a>> {
-        let new = Some(locale);
-        std::mem::replace(&mut self.locale, new)
+        std::mem::replace(&mut self.locale, Some(locale))
     }
 
     pub fn get_value(&self) -> &str {
         &self.value
     }
 
-    // TODO: validate input
-    pub fn set_value(&mut self, value: String) -> Cow<str> {
-        let new = Cow::Owned(value);
-        std::mem::replace(&mut self.value, new)
+    pub fn set_value(&mut self, value: Value<'static>) -> Cow<str> {
+        std::mem::replace(&mut self.value, value.into())
     }
 
-    // TODO: validate input
-    pub fn set_value_borrowed<'v: 'a>(&mut self, value: &'v str) -> Cow<str> {
-        let new = Cow::Borrowed(value);
-        std::mem::replace(&mut self.key, new)
+    pub fn set_value_borrowed<'v: 'a>(&mut self, value: Value<'v>) -> Cow<str> {
+        std::mem::replace(&mut self.key, value.into())
     }
 
-    // TODO: validate input
-    pub fn set_whitespace(&mut self, wsl: String, wsr: String) -> (Cow<str>, Cow<str>) {
-        let new_wsl = Cow::Owned(wsl);
-        let new_wsr = Cow::Owned(wsr);
+    pub fn set_whitespace(&mut self, wsl: Whitespace<'static>, wsr: Whitespace<'static>) -> (Cow<str>, Cow<str>) {
         (
-            std::mem::replace(&mut self.wsl, new_wsl),
-            std::mem::replace(&mut self.wsr, new_wsr),
+            std::mem::replace(&mut self.wsl, wsl.into()),
+            std::mem::replace(&mut self.wsr, wsr.into()),
         )
     }
 
-    // TODO: validate input
-    pub fn set_whitespace_borrowed<'w: 'a>(&mut self, wsl: &'w str, wsr: &'w str) -> (Cow<str>, Cow<str>) {
-        let new_wsl = Cow::Borrowed(wsl);
-        let new_wsr = Cow::Borrowed(wsr);
+    pub fn set_whitespace_borrowed<'w: 'a>(
+        &mut self,
+        wsl: Whitespace<'w>,
+        wsr: Whitespace<'w>,
+    ) -> (Cow<str>, Cow<str>) {
         (
-            std::mem::replace(&mut self.wsl, new_wsl),
-            std::mem::replace(&mut self.wsr, new_wsr),
+            std::mem::replace(&mut self.wsl, wsl.into()),
+            std::mem::replace(&mut self.wsr, wsr.into()),
         )
     }
 
@@ -143,14 +132,12 @@ impl<'a> KeyValuePair<'a> {
         self.decor.as_slice()
     }
 
-    pub fn set_decor(&mut self, decor: Vec<String>) -> Vec<Cow<str>> {
-        let new = decor.into_iter().map(Cow::Owned).collect();
-        std::mem::replace(&mut self.decor, new)
+    pub fn set_decor(&mut self, decor: Decor<'static>) -> Vec<Cow<str>> {
+        std::mem::replace(&mut self.decor, decor.into())
     }
 
-    pub fn set_decor_borrowed<'d: 'a>(&mut self, decor: Vec<&'d str>) -> Vec<Cow<str>> {
-        let new = decor.iter().map(|s| Cow::Borrowed(*s)).collect();
-        std::mem::replace(&mut self.decor, new)
+    pub fn set_decor_borrowed<'d: 'a>(&mut self, decor: Decor<'d>) -> Vec<Cow<str>> {
+        std::mem::replace(&mut self.decor, decor.into())
     }
 }
 
@@ -174,7 +161,6 @@ impl<'a> Display for KeyValuePair<'a> {
 pub struct Locale<'a> {
     pub(crate) lang: Cow<'a, str>,
     pub(crate) country: Option<Cow<'a, str>>,
-    // encoding: Option<&'a str>,
     pub(crate) modifier: Option<Cow<'a, str>>,
 }
 
@@ -270,8 +256,7 @@ pub struct Group<'a> {
 }
 
 impl<'a> Group<'a> {
-    // TODO: validate input
-    pub fn new(name: String) -> Self {
+    pub fn new(name: GroupName<'static>) -> Self {
         Group {
             name: name.into(),
             entries: IndexMap::new(),
@@ -279,8 +264,7 @@ impl<'a> Group<'a> {
         }
     }
 
-    // TODO: validate input
-    pub fn new_borrowed<'e: 'a>(name: &'e str) -> Self {
+    pub fn new_borrowed<'e: 'a>(name: GroupName<'e>) -> Self {
         Group {
             name: name.into(),
             entries: IndexMap::new(),
@@ -290,7 +274,7 @@ impl<'a> Group<'a> {
 
     #[allow(unused)]
     pub(crate) fn from_entries(
-        name: String,
+        name: GroupName<'static>,
         entries: IndexMap<(Cow<'static, str>, Option<Locale<'static>>), KeyValuePair<'static>>,
         decor: Decor<'static>,
     ) -> Self {
@@ -302,7 +286,7 @@ impl<'a> Group<'a> {
     }
 
     pub(crate) fn from_entries_borrowed<'e: 'a>(
-        name: &'e str,
+        name: GroupName<'e>,
         entries: IndexMap<(Cow<'e, str>, Option<Locale<'e>>), KeyValuePair<'e>>,
         decor: Decor<'e>,
     ) -> Self {

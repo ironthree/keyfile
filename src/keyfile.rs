@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use crate::basic::{Group, KeyValuePair};
 use crate::error::KeyFileError;
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
-use crate::validate::{Decor, Key, Value, Whitespace};
+use crate::validate::{Decor, GroupName, Key, Value, Whitespace};
 
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
@@ -45,7 +45,7 @@ impl<'a> KeyFile<'a> {
                     // already checked if there was a previous group with this name
                 }
                 current_group = Some(Group::from_entries_borrowed(
-                    header,
+                    GroupName::new_unchecked(header.into()),
                     IndexMap::new(),
                     Decor::new_unchecked(std::mem::take(&mut decor)),
                 ));

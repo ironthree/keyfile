@@ -2,6 +2,66 @@ use std::borrow::Cow;
 use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
+pub struct GroupName<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> GroupName<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'n: 'a>(value: Cow<'n, str>) -> Self {
+        GroupName { inner: value }
+    }
+}
+
+impl<'a> From<GroupName<'a>> for Cow<'a, str> {
+    fn from(value: GroupName<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Group name: group names may only contain printable ASCII, except for the '[' and ']' characters")]
+pub struct InvalidGroupName;
+
+impl<'a> TryFrom<Cow<'a, str>> for GroupName<'a> {
+    type Error = InvalidGroupName;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        for c in value.chars() {
+            if !c.is_ascii() {
+                return Err(InvalidGroupName);
+            }
+            if c.is_ascii_control() {
+                return Err(InvalidGroupName);
+            }
+            if c == '[' || c == ']' {
+                return Err(InvalidGroupName);
+            }
+        }
+
+        Ok(GroupName { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for GroupName<'a> {
+    type Error = InvalidGroupName;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        GroupName::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for GroupName<'a> {
+    type Error = InvalidGroupName;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        GroupName::try_from(Cow::Owned(value))
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Key<'a> {
     inner: Cow<'a, str>,
 }
