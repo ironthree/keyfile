@@ -6,6 +6,7 @@ use indexmap::IndexMap;
 use crate::basic::{Group, KeyValuePair};
 use crate::error::KeyFileError;
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
+use crate::validate::Key;
 
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
@@ -59,7 +60,7 @@ impl<'a> KeyFile<'a> {
                     };
 
                     let kv = KeyValuePair::new_with_decor_borrowed(
-                        key,
+                        Key::new_unchecked(Cow::Borrowed(key)),
                         // this clone is cheap since locale contains only Cow::Borrowed
                         locale.clone(),
                         value,

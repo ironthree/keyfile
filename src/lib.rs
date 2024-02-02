@@ -6,6 +6,7 @@ mod basic;
 mod error;
 mod keyfile;
 mod parse;
+mod validate;
 
 pub use basic::*;
 pub use error::KeyFileError;
