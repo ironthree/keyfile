@@ -1,8 +1,10 @@
 [package]
 name = "keyfile"
-description = "Parse and write files in glib2's Keyfile format (like \".desktop\" files)"
+description = """Parse, write, and modify files with the glib2 KeyFile format
+ (based on the XDG Desktop Entry Specification)"""
 license = "MIT OR Apache-2.0"
 
+publish = false
 version = "0.1.0-dev"
 edition = "2021"
 rust-version = "1.60.0"
@@ -12,7 +14,7 @@ readme = "README.md"
 exclude = ["/tests/", "/.github/", "/rustfmt.toml"]
 #categories = []
 #keywords = []
-#repository = "https://github.com/ironthree/keyfile"
+repository = "https://github.com/ironthree/keyfile"
 
 [dependencies]
 indexmap = "2"

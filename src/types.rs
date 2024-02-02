@@ -1,8 +1,12 @@
 use std::borrow::Cow;
-use std::fmt::Debug;
+use std::fmt::{self, Debug, Display};
 
+use indexmap::IndexMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
+
+pub mod errors;
+use errors::*;
 
 static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
     // keep in sync with src/parse.rs:HEADER
@@ -48,10 +52,6 @@ impl<'a> From<GroupName<'a>> for Cow<'a, str> {
         value.inner
     }
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Group name: group names may only contain printable ASCII, except for the '[' and ']' characters")]
-pub struct InvalidGroupName;
 
 impl<'a> TryFrom<Cow<'a, str>> for GroupName<'a> {
     type Error = InvalidGroupName;
@@ -102,14 +102,6 @@ impl<'a> From<Key<'a>> for Cow<'a, str> {
     fn from(value: Key<'a>) -> Self {
         value.inner
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidKey {
-    #[error("Invalid Key: keys must be ASCII-only")]
-    NotAscii,
-    #[error("Invalid Key: keys can only contain alphanumeric characters and hyphens")]
-    NotAlphanumeric,
 }
 
 impl<'a> TryFrom<Cow<'a, str>> for Key<'a> {
@@ -167,10 +159,6 @@ impl<'a> From<Language<'a>> for Cow<'a, str> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Language: language names may only contain alphabetic ASCII characters")]
-pub struct InvalidLanguage;
-
 impl<'a> TryFrom<Cow<'a, str>> for Language<'a> {
     type Error = InvalidLanguage;
 
@@ -220,10 +208,6 @@ impl<'a> From<Country<'a>> for Cow<'a, str> {
         value.inner
     }
 }
-
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Country: country names may only contain alphabetic ASCII characters")]
-pub struct InvalidCountry;
 
 impl<'a> TryFrom<Cow<'a, str>> for Country<'a> {
     type Error = InvalidCountry;
@@ -275,10 +259,6 @@ impl<'a> From<Encoding<'a>> for Cow<'a, str> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Country: country names may only contain alphanmumeric ASCII characters and hyphens")]
-pub struct InvalidEncoding;
-
 impl<'a> TryFrom<Cow<'a, str>> for Encoding<'a> {
     type Error = InvalidEncoding;
 
@@ -329,10 +309,6 @@ impl<'a> From<Modifier<'a>> for Cow<'a, str> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Country: country names may only contain alphabetic ASCII characters")]
-pub struct InvalidModifier;
-
 impl<'a> TryFrom<Cow<'a, str>> for Modifier<'a> {
     type Error = InvalidModifier;
 
@@ -382,14 +358,6 @@ impl<'a> From<Value<'a>> for Cow<'a, str> {
     fn from(value: Value<'a>) -> Self {
         value.inner
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidValue {
-    #[error("Invalid Value: values cannot contain control characters")]
-    ContainsControlCharacter,
-    #[error("Invalid Value: values cannot span multiple lines")]
-    ContainsNewline,
 }
 
 impl<'a> TryFrom<Cow<'a, str>> for Value<'a> {
@@ -446,10 +414,6 @@ impl<'a> From<Whitespace<'a>> for Cow<'a, str> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Whitespace: whitespace must be ' ' or '\t'")]
-pub struct InvalidWhitespace;
-
 impl<'a> TryFrom<Cow<'a, str>> for Whitespace<'a> {
     type Error = InvalidWhitespace;
 
@@ -501,10 +465,6 @@ impl<'a> From<Decor<'a>> for Vec<Cow<'a, str>> {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("Invalid Decor: decor must be either empty lines or lines that start with the '#' character")]
-pub struct InvalidDecor;
-
 impl<'a> TryFrom<Vec<Cow<'a, str>>> for Decor<'a> {
     type Error = InvalidDecor;
 
@@ -532,5 +492,247 @@ impl<'a> TryFrom<Vec<String>> for Decor<'a> {
 
     fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
         Decor::try_from(value.into_iter().map(Cow::Owned).collect::<Vec<_>>())
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct KeyValuePair<'a> {
+    pub(crate) key: Cow<'a, str>,
+    pub(crate) locale: Option<Locale<'a>>,
+    pub(crate) value: Cow<'a, str>,
+    pub(crate) wsl: Cow<'a, str>,
+    pub(crate) wsr: Cow<'a, str>,
+    pub(crate) decor: Vec<Cow<'a, str>>,
+}
+
+impl<'a> KeyValuePair<'a> {
+    pub fn new<'kv: 'a>(key: Key<'kv>, locale: Option<Locale<'kv>>, value: Value<'kv>) -> Self {
+        KeyValuePair {
+            key: key.into(),
+            locale,
+            value: value.into(),
+            wsl: " ".into(),
+            wsr: " ".into(),
+            decor: Vec::new(),
+        }
+    }
+
+    pub fn new_with_decor<'kv: 'a>(
+        key: Key<'kv>,
+        locale: Option<Locale<'kv>>,
+        value: Value<'kv>,
+        wsl: Whitespace<'kv>,
+        wsr: Whitespace<'kv>,
+        decor: Decor<'kv>,
+    ) -> Self {
+        KeyValuePair {
+            key: key.into(),
+            locale,
+            value: value.into(),
+            wsl: wsl.into(),
+            wsr: wsr.into(),
+            decor: decor.into(),
+        }
+    }
+
+    pub fn get_key(&self) -> &str {
+        &self.key
+    }
+
+    pub fn set_key<'k: 'a>(&mut self, key: Key<'k>) -> Cow<str> {
+        std::mem::replace(&mut self.key, key.into())
+    }
+
+    pub fn get_locale(&self) -> Option<&Locale> {
+        self.locale.as_ref()
+    }
+
+    pub fn set_locale<'l: 'a>(&mut self, locale: Locale<'l>) -> Option<Locale<'a>> {
+        std::mem::replace(&mut self.locale, Some(locale))
+    }
+
+    pub fn get_value(&self) -> &str {
+        &self.value
+    }
+
+    pub fn set_value<'v: 'a>(&mut self, value: Value<'v>) -> Cow<str> {
+        std::mem::replace(&mut self.value, value.into())
+    }
+
+    pub fn set_whitespace<'w: 'a>(&mut self, wsl: Whitespace<'w>, wsr: Whitespace<'w>) -> (Cow<str>, Cow<str>) {
+        (
+            std::mem::replace(&mut self.wsl, wsl.into()),
+            std::mem::replace(&mut self.wsr, wsr.into()),
+        )
+    }
+
+    pub fn get_decor(&self) -> &[Cow<str>] {
+        self.decor.as_slice()
+    }
+
+    pub fn set_decor<'d: 'a>(&mut self, decor: Decor<'d>) -> Vec<Cow<str>> {
+        std::mem::replace(&mut self.decor, decor.into())
+    }
+}
+
+impl<'a> Display for KeyValuePair<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.decor {
+            writeln!(f, "{}", line)?;
+        }
+
+        if let Some(locale) = &self.locale {
+            write!(f, "{}[{}]{}={}{}", self.key, locale, self.wsl, self.wsr, self.value)?;
+        } else {
+            write!(f, "{}{}={}{}", self.key, self.wsl, self.wsr, self.value)?;
+        }
+
+        Ok(())
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Locale<'a> {
+    pub(crate) lang: Cow<'a, str>,
+    pub(crate) country: Option<Cow<'a, str>>,
+    pub(crate) encoding: Option<Cow<'a, str>>,
+    pub(crate) modifier: Option<Cow<'a, str>>,
+}
+
+impl<'a> Locale<'a> {
+    pub fn new<'l: 'a>(lang: Language<'l>, country: Option<Country<'l>>, modifier: Option<Modifier<'l>>) -> Self {
+        Locale {
+            lang: lang.into(),
+            country: country.map(Into::into),
+            encoding: None,
+            modifier: modifier.map(Into::into),
+        }
+    }
+
+    pub(crate) fn new_with_encoding<'l: 'a>(
+        lang: Language<'l>,
+        country: Option<Country<'l>>,
+        encoding: Option<Encoding<'l>>,
+        modifier: Option<Modifier<'l>>,
+    ) -> Self {
+        Locale {
+            lang: lang.into(),
+            country: country.map(Into::into),
+            encoding: encoding.map(Into::into),
+            modifier: modifier.map(Into::into),
+        }
+    }
+
+    pub fn get_lang(&self) -> &str {
+        &self.lang
+    }
+
+    pub fn set_lang<'l: 'a>(&mut self, lang: Language<'l>) -> Cow<str> {
+        std::mem::replace(&mut self.lang, lang.into())
+    }
+
+    pub fn get_country(&self) -> Option<&str> {
+        self.country.as_deref()
+    }
+
+    pub fn set_country<'c: 'a>(&mut self, country: Option<Country<'c>>) -> Option<Cow<str>> {
+        std::mem::replace(&mut self.country, country.map(Into::into))
+    }
+
+    pub fn get_encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
+    }
+
+    pub fn get_modifier(&self) -> Option<&str> {
+        self.modifier.as_deref()
+    }
+
+    pub fn set_modifier<'m: 'a>(&mut self, modifier: Option<Modifier<'m>>) -> Option<Cow<str>> {
+        std::mem::replace(&mut self.modifier, modifier.map(Into::into))
+    }
+}
+
+impl<'a> Display for Locale<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.lang)?;
+
+        if let Some(country) = &self.country {
+            write!(f, "_{}", country)?;
+        }
+
+        if let Some(modifier) = &self.modifier {
+            write!(f, "@{}", modifier)?;
+        }
+
+        Ok(())
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug)]
+pub struct Group<'a> {
+    pub(crate) name: Cow<'a, str>,
+    pub(crate) entries: IndexMap<(Cow<'a, str>, Option<Locale<'a>>), KeyValuePair<'a>>,
+    pub(crate) decor: Vec<Cow<'a, str>>,
+}
+
+impl<'a> Group<'a> {
+    pub fn new<'e: 'a>(name: GroupName<'e>) -> Self {
+        Group {
+            name: name.into(),
+            entries: IndexMap::new(),
+            decor: Vec::new(),
+        }
+    }
+
+    pub(crate) fn from_entries<'e: 'a>(
+        name: GroupName<'e>,
+        entries: IndexMap<(Cow<'e, str>, Option<Locale<'e>>), KeyValuePair<'e>>,
+        decor: Decor<'e>,
+    ) -> Self {
+        Group {
+            name: name.into(),
+            entries,
+            decor: decor.into(),
+        }
+    }
+
+    pub fn get<'k: 'a>(&self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&KeyValuePair> {
+        self.entries.get(&(key.into(), locale))
+    }
+
+    pub fn get_mut<'k: 'a>(&'a mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&mut KeyValuePair> {
+        self.entries.get_mut(&(key.into(), locale))
+    }
+
+    pub fn insert<'kv: 'a>(&mut self, kv: KeyValuePair<'kv>) -> Option<KeyValuePair> {
+        // This clone is cheap only if the kv.key is a Cow::Borrowed(&str).
+        // If kv.key is a Cow::Owned(String), the String needs to be copied.
+        self.entries.insert((kv.key.clone(), kv.locale.clone()), kv)
+    }
+
+    // This method preserves order by calling the order-preserving IndexMap::shift_remove method.
+    pub fn remove<'k: 'a>(&mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<KeyValuePair> {
+        self.entries.shift_remove(&(key.into(), locale))
+    }
+}
+
+impl<'a> Display for Group<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for line in &self.decor {
+            writeln!(f, "{}", line)?;
+        }
+        writeln!(f, "[{}]", self.name)?;
+
+        for kv in self.entries.values() {
+            writeln!(f, "{}", kv)?;
+        }
+
+        Ok(())
     }
 }

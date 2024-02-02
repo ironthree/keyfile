@@ -4,9 +4,8 @@ use std::fmt::{self, Debug, Display};
 use indexmap::IndexMap;
 use thiserror::Error;
 
-use crate::basic::{Group, KeyValuePair};
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
-use crate::validate::{Decor, GroupName, Key, Value, Whitespace};
+use crate::types::{Decor, Group, GroupName, Key, KeyValuePair, Value, Whitespace};
 
 #[derive(Debug, Error)]
 pub enum KeyFileError {

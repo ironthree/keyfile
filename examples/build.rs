@@ -1,4 +1,5 @@
-use keyfile::{Group, KeyFile, KeyValuePair};
+use keyfile::types::{Group, KeyValuePair};
+use keyfile::KeyFile;
 
 fn main() -> anyhow::Result<()> {
     let kv1 = KeyValuePair::new_with_decor(
