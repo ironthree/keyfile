@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 #[derive(Clone, Debug)]
 pub struct Key<'a> {
-    pub inner: Cow<'a, str>,
+    inner: Cow<'a, str>,
 }
 
 impl<'a> Key<'a> {
@@ -120,5 +120,58 @@ impl<'a> TryFrom<String> for Value<'a> {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Value::try_from(Cow::Owned(value))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Whitespace<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Whitespace<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Whitespace { inner: value }
+    }
+}
+
+impl<'a> From<Whitespace<'a>> for Cow<'a, str> {
+    #[inline(always)]
+    fn from(value: Whitespace<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Whitespace: whitespace must be ' ' or '\t'")]
+pub struct InvalidWhitespace;
+
+impl<'a> TryFrom<Cow<'a, str>> for Whitespace<'a> {
+    type Error = InvalidWhitespace;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        for c in value.chars() {
+            if !c.is_ascii_whitespace() {
+                return Err(InvalidWhitespace);
+            }
+        }
+
+        Ok(Whitespace { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Whitespace<'a> {
+    type Error = InvalidWhitespace;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Whitespace::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Whitespace<'a> {
+    type Error = InvalidWhitespace;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Whitespace::try_from(Cow::Owned(value))
     }
 }

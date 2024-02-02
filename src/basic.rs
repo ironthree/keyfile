@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
 
-use crate::validate::{Key, Value};
+use crate::validate::{Key, Value, Whitespace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -43,8 +43,8 @@ impl<'a> KeyValuePair<'a> {
         key: Key<'static>,
         locale: Option<Locale<'static>>,
         value: Value<'static>,
-        wsl: String,
-        wsr: String,
+        wsl: Whitespace<'static>,
+        wsr: Whitespace<'static>,
         decor: Vec<String>,
     ) -> Self {
         KeyValuePair {
@@ -62,8 +62,8 @@ impl<'a> KeyValuePair<'a> {
         key: Key<'kv>,
         locale: Option<Locale<'kv>>,
         value: Value<'kv>,
-        wsl: &'kv str,
-        wsr: &'kv str,
+        wsl: Whitespace<'kv>,
+        wsr: Whitespace<'kv>,
         decor: Vec<&'kv str>,
     ) -> Self {
         KeyValuePair {

@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 use crate::basic::{Group, KeyValuePair};
 use crate::error::KeyFileError;
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
-use crate::validate::{Key, Value};
+use crate::validate::{Key, Value, Whitespace};
 
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
@@ -60,12 +60,12 @@ impl<'a> KeyFile<'a> {
                     };
 
                     let kv = KeyValuePair::new_with_decor_borrowed(
-                        Key::new_unchecked(Cow::Borrowed(key)),
+                        Key::new_unchecked(key.into()),
                         // this clone is cheap since locale contains only Cow::Borrowed
                         locale.clone(),
-                        Value::new_unchecked(Cow::Borrowed(value)),
-                        wsl,
-                        wsr,
+                        Value::new_unchecked(value.into()),
+                        Whitespace::new_unchecked(wsl.into()),
+                        Whitespace::new_unchecked(wsr.into()),
                         std::mem::take(&mut decor),
                     );
                     if let Some(_previous) = collector.entries.insert((key.into(), locale), kv) {
