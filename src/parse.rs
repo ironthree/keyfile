@@ -20,7 +20,7 @@ static KEY_VALUE_PAIR: Lazy<Regex> = Lazy::new(|| {
     // - "=" character,
     // - optional whitespace,
     // - value (printable ASCII or UTF-8)
-    Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$")
+    Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:\.(?<encoding>[[:alnum:]-]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$")
         .expect("Failed to compile hard-coded regular expression.")
 });
 
@@ -35,6 +35,7 @@ pub fn parse_as_key_value_pair(line: &str) -> Option<(&str, Option<Locale>, &str
     let key = caps.name("key")?.as_str();
     let lang = caps.name("lang").map(|m| m.as_str());
     let country = caps.name("country").map(|m| m.as_str());
+    // let encoding = caps.name("encoding").map(|m| m.as_str());
     let modifier = caps.name("modifier").map(|m| m.as_str());
     let value = caps.name("value")?.as_str();
 
