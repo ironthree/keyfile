@@ -8,8 +8,6 @@ pub enum KeyFileError {
     DuplicateGroup { name: String, lineno: usize },
     #[error("Multiple key-value pairs with the same key (line {}): {}", .lineno, .key)]
     DuplicateKey { key: String, lineno: usize },
-    #[error("No group with name: {}", .name)]
-    MissingGroup { name: String },
 }
 
 impl KeyFileError {
@@ -23,9 +21,5 @@ impl KeyFileError {
 
     pub(crate) fn duplicate_key(key: String, lineno: usize) -> Self {
         KeyFileError::DuplicateKey { key, lineno }
-    }
-
-    pub(crate) fn missing_group(name: String) -> Self {
-        KeyFileError::MissingGroup { name }
     }
 }

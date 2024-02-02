@@ -7,5 +7,6 @@ mod error;
 mod keyfile;
 mod parse;
 
+pub use basic::*;
 pub use error::KeyFileError;
-pub use keyfile::KeyFile;
+pub use keyfile::*;

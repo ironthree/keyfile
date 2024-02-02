@@ -42,7 +42,7 @@ pub fn parse_as_key_value_pair(line: &str) -> Option<(&str, Option<Locale>, &str
     let wsl = caps.name("wsl")?.as_str();
     let wsr = caps.name("wsr")?.as_str();
 
-    let locale = lang.map(|lang| Locale::new(lang, country, modifier));
+    let locale = lang.map(|lang| Locale::new_borrowed(lang, country, modifier));
     Some((key, locale, value, wsl, wsr))
 }
 
@@ -70,17 +70,23 @@ mod tests {
         );
         assert_eq!(
             parse_as_key_value_pair("Name[de] =Dateien").unwrap(),
-            ("Name", Some(Locale::new("de", None, None)), "Dateien", " ", ""),
+            ("Name", Some(Locale::new_borrowed("de", None, None)), "Dateien", " ", ""),
         );
         assert_eq!(
             parse_as_key_value_pair("Name[en_GB] = Files").unwrap(),
-            ("Name", Some(Locale::new("en", Some("GB"), None)), "Files", " ", " ")
+            (
+                "Name",
+                Some(Locale::new_borrowed("en", Some("GB"), None)),
+                "Files",
+                " ",
+                " "
+            )
         );
         assert_eq!(
             parse_as_key_value_pair("Name[sr@latin]= Datoteke").unwrap(),
             (
                 "Name",
-                Some(Locale::new("sr", None, Some("latin"))),
+                Some(Locale::new_borrowed("sr", None, Some("latin"))),
                 "Datoteke",
                 "",
                 " "
