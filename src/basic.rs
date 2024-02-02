@@ -198,6 +198,54 @@ impl<'a> Locale<'a> {
             modifier: modifier.map(Cow::Borrowed),
         }
     }
+
+    pub fn get_lang(&self) -> &str {
+        &self.lang
+    }
+
+    // TODO: validate input
+    pub fn set_lang(&mut self, lang: String) -> Cow<str> {
+        let new = Cow::Owned(lang);
+        std::mem::replace(&mut self.lang, new)
+    }
+
+    // TODO: validate input
+    pub fn set_lang_borrowed<'l: 'a>(&mut self, lang: &'l str) -> Cow<str> {
+        let new = Cow::Borrowed(lang);
+        std::mem::replace(&mut self.lang, new)
+    }
+
+    pub fn get_country(&self) -> Option<&str> {
+        self.country.as_deref()
+    }
+
+    // TODO: validate input
+    pub fn set_country(&mut self, country: Option<String>) -> Option<Cow<str>> {
+        let new = country.map(Cow::Owned);
+        std::mem::replace(&mut self.country, new)
+    }
+
+    // TODO: validate input
+    pub fn set_country_borrowed<'c: 'a>(&mut self, country: Option<&'c str>) -> Option<Cow<str>> {
+        let new = country.map(Cow::Borrowed);
+        std::mem::replace(&mut self.country, new)
+    }
+
+    pub fn get_modifier(&self) -> Option<&str> {
+        self.modifier.as_deref()
+    }
+
+    // TODO: validate input
+    pub fn set_modifier(&mut self, modifier: Option<String>) -> Option<Cow<str>> {
+        let new = modifier.map(Cow::Owned);
+        std::mem::replace(&mut self.modifier, new)
+    }
+
+    // TODO: validate input
+    pub fn set_modifier_borrowed<'m: 'a>(&mut self, modifier: Option<&'m str>) -> Option<Cow<str>> {
+        let new = modifier.map(Cow::Borrowed);
+        std::mem::replace(&mut self.modifier, new)
+    }
 }
 
 impl<'a> Display for Locale<'a> {
