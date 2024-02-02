@@ -168,7 +168,7 @@ impl<'a> From<Language<'a>> for Cow<'a, str> {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Invalid Language: language names may only contain printable ASCII")]
+#[error("Invalid Language: language names may only contain alphabetic ASCII characters")]
 pub struct InvalidLanguage;
 
 impl<'a> TryFrom<Cow<'a, str>> for Language<'a> {
@@ -222,7 +222,7 @@ impl<'a> From<Country<'a>> for Cow<'a, str> {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("Invalid Country: country names may only contain printable ASCII")]
+#[error("Invalid Country: country names may only contain alphabetic ASCII characters")]
 pub struct InvalidCountry;
 
 impl<'a> TryFrom<Cow<'a, str>> for Country<'a> {
@@ -252,6 +252,114 @@ impl<'a> TryFrom<String> for Country<'a> {
     #[inline(always)]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Country::try_from(Cow::Owned(value))
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug)]
+pub struct Encoding<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Encoding<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Encoding { inner: value }
+    }
+}
+
+impl<'a> From<Encoding<'a>> for Cow<'a, str> {
+    fn from(value: Encoding<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Country: country names may only contain alphanmumeric ASCII characters and hyphens")]
+pub struct InvalidEncoding;
+
+impl<'a> TryFrom<Cow<'a, str>> for Encoding<'a> {
+    type Error = InvalidEncoding;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !ENCODING.is_match(&value) {
+            return Err(InvalidEncoding);
+        }
+
+        Ok(Encoding { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Encoding<'a> {
+    type Error = InvalidEncoding;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Encoding::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Encoding<'a> {
+    type Error = InvalidEncoding;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Encoding::try_from(Cow::Owned(value))
+    }
+}
+
+// =============================================================================
+
+#[derive(Clone, Debug)]
+pub struct Modifier<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Modifier<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Modifier { inner: value }
+    }
+}
+
+impl<'a> From<Modifier<'a>> for Cow<'a, str> {
+    fn from(value: Modifier<'a>) -> Self {
+        value.inner
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Invalid Country: country names may only contain alphabetic ASCII characters")]
+pub struct InvalidModifier;
+
+impl<'a> TryFrom<Cow<'a, str>> for Modifier<'a> {
+    type Error = InvalidModifier;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !MODIFIER.is_match(&value) {
+            return Err(InvalidModifier);
+        }
+
+        Ok(Modifier { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Modifier<'a> {
+    type Error = InvalidModifier;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Modifier::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Modifier<'a> {
+    type Error = InvalidModifier;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Modifier::try_from(Cow::Owned(value))
     }
 }
 

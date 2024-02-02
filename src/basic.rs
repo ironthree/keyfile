@@ -3,7 +3,7 @@ use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
 
-use crate::validate::{Country, Decor, GroupName, Key, Language, Value, Whitespace};
+use crate::validate::{Country, Decor, Encoding, GroupName, Key, Language, Modifier, Value, Whitespace};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -105,25 +105,31 @@ impl<'a> Display for KeyValuePair<'a> {
 pub struct Locale<'a> {
     pub(crate) lang: Cow<'a, str>,
     pub(crate) country: Option<Cow<'a, str>>,
+    pub(crate) encoding: Option<Cow<'a, str>>,
     pub(crate) modifier: Option<Cow<'a, str>>,
 }
 
 impl<'a> Locale<'a> {
-    // TODO: validate input
-    pub fn new(lang: Language<'static>, country: Option<Country<'static>>, modifier: Option<String>) -> Self {
+    pub fn new<'l: 'a>(lang: Language<'l>, country: Option<Country<'l>>, modifier: Option<Modifier<'l>>) -> Self {
         Locale {
             lang: lang.into(),
             country: country.map(Into::into),
-            modifier: modifier.map(Cow::Owned),
+            encoding: None,
+            modifier: modifier.map(Into::into),
         }
     }
 
-    // TODO: validate input
-    pub fn new_borrowed<'l: 'a>(lang: Language<'l>, country: Option<Country<'l>>, modifier: Option<&'l str>) -> Self {
+    pub(crate) fn new_with_encoding<'l: 'a>(
+        lang: Language<'l>,
+        country: Option<Country<'l>>,
+        encoding: Option<Encoding<'l>>,
+        modifier: Option<Modifier<'l>>,
+    ) -> Self {
         Locale {
             lang: lang.into(),
             country: country.map(Into::into),
-            modifier: modifier.map(Cow::Borrowed),
+            encoding: encoding.map(Into::into),
+            modifier: modifier.map(Into::into),
         }
     }
 
@@ -139,32 +145,20 @@ impl<'a> Locale<'a> {
         self.country.as_deref()
     }
 
-    // TODO: validate input
-    pub fn set_country(&mut self, country: Option<String>) -> Option<Cow<str>> {
-        let new = country.map(Cow::Owned);
-        std::mem::replace(&mut self.country, new)
+    pub fn set_country<'c: 'a>(&mut self, country: Option<Country<'c>>) -> Option<Cow<str>> {
+        std::mem::replace(&mut self.country, country.map(Into::into))
     }
 
-    // TODO: validate input
-    pub fn set_country_borrowed<'c: 'a>(&mut self, country: Option<&'c str>) -> Option<Cow<str>> {
-        let new = country.map(Cow::Borrowed);
-        std::mem::replace(&mut self.country, new)
+    pub fn get_encoding(&self) -> Option<&str> {
+        self.encoding.as_deref()
     }
 
     pub fn get_modifier(&self) -> Option<&str> {
         self.modifier.as_deref()
     }
 
-    // TODO: validate input
-    pub fn set_modifier(&mut self, modifier: Option<String>) -> Option<Cow<str>> {
-        let new = modifier.map(Cow::Owned);
-        std::mem::replace(&mut self.modifier, new)
-    }
-
-    // TODO: validate input
-    pub fn set_modifier_borrowed<'m: 'a>(&mut self, modifier: Option<&'m str>) -> Option<Cow<str>> {
-        let new = modifier.map(Cow::Borrowed);
-        std::mem::replace(&mut self.modifier, new)
+    pub fn set_modifier<'m: 'a>(&mut self, modifier: Option<Modifier<'m>>) -> Option<Cow<str>> {
+        std::mem::replace(&mut self.modifier, modifier.map(Into::into))
     }
 }
 

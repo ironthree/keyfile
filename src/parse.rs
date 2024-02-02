@@ -1,8 +1,10 @@
+use std::borrow::Cow;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::basic::Locale;
-use crate::validate::{Country, Language};
+use crate::validate::{Country, Encoding, Language, Modifier};
 
 static HEADER: Lazy<Regex> = Lazy::new(|| {
     // group header:
@@ -12,15 +14,18 @@ static HEADER: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^\[(?<name>[[:print:][^\[\]]]+)\]$").expect("Failed to compile hard-coded regular expression.")
 });
 
-// TODO: document that encoding modifier is not supported since only UTF-8-only files are supported
 static KEY_VALUE_PAIR: Lazy<Regex> = Lazy::new(|| {
     // key-value pair:
-    // - key (only alphanumeric or "-") with optional locale specifier (opening "[", "lang_COUNTRY.ENCODING@MODIFIER",
-    //   closing "]"),
+    // - key (only alphanumeric or "-") with optional locale specifier,
     // - optional whitespace,
     // - "=" character,
     // - optional whitespace,
     // - value (printable ASCII or UTF-8)
+    //
+    // locale specifier:
+    // - opening "[",
+    // - "<lang><_COUNTRY><.ENCODING><@MODIFIER>" (with all components except <lang> being optional),
+    // - closing "]"
     Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:\.(?<encoding>[[:alnum:]-]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$")
         .expect("Failed to compile hard-coded regular expression.")
 });
@@ -36,7 +41,7 @@ pub fn parse_as_key_value_pair(line: &str) -> Option<(&str, Option<Locale>, &str
     let key = caps.name("key")?.as_str();
     let lang = caps.name("lang").map(|m| m.as_str());
     let country = caps.name("country").map(|m| m.as_str());
-    // let encoding = caps.name("encoding").map(|m| m.as_str());
+    let encoding = caps.name("encoding").map(|m| m.as_str());
     let modifier = caps.name("modifier").map(|m| m.as_str());
     let value = caps.name("value")?.as_str();
 
@@ -45,10 +50,11 @@ pub fn parse_as_key_value_pair(line: &str) -> Option<(&str, Option<Locale>, &str
     let wsr = caps.name("wsr")?.as_str();
 
     let locale = lang.map(|lang| {
-        Locale::new_borrowed(
-            Language::new_unchecked(lang.into()),
-            country.map(|c| Country::new_unchecked(c.into())),
-            modifier,
+        Locale::new_with_encoding(
+            Language::new_unchecked(Cow::Borrowed(lang)),
+            country.map(|c| Country::new_unchecked(Cow::Borrowed(c))),
+            encoding.map(|e| Encoding::new_unchecked(Cow::Borrowed(e))),
+            modifier.map(|m| Modifier::new_unchecked(Cow::Borrowed(m))),
         )
     });
     Some((key, locale, value, wsl, wsr))
@@ -80,7 +86,7 @@ mod tests {
             parse_as_key_value_pair("Name[de] =Dateien").unwrap(),
             (
                 "Name",
-                Some(Locale::new_borrowed("de".try_into().unwrap(), None, None)),
+                Some(Locale::new("de".try_into().unwrap(), None, None)),
                 "Dateien",
                 " ",
                 ""
@@ -90,7 +96,7 @@ mod tests {
             parse_as_key_value_pair("Name[en_GB] = Files").unwrap(),
             (
                 "Name",
-                Some(Locale::new_borrowed(
+                Some(Locale::new(
                     "en".try_into().unwrap(),
                     Some("GB".try_into().unwrap()),
                     None
@@ -104,7 +110,11 @@ mod tests {
             parse_as_key_value_pair("Name[sr@latin]= Datoteke").unwrap(),
             (
                 "Name",
-                Some(Locale::new_borrowed("sr".try_into().unwrap(), None, Some("latin"))),
+                Some(Locale::new(
+                    "sr".try_into().unwrap(),
+                    None,
+                    Some("latin".try_into().unwrap())
+                )),
                 "Datoteke",
                 "",
                 " "
