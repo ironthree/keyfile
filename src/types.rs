@@ -2,500 +2,11 @@ use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
 
 use indexmap::IndexMap;
-use once_cell::sync::Lazy;
-use regex::Regex;
 
+pub mod basic;
 pub mod errors;
-use errors::*;
 
-static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:HEADER
-    Regex::new(r"^[[:print:][^\[\]]]+$").expect("Failed to compile hard-coded regular expression.")
-});
-
-static LANGUAGE: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
-});
-
-static COUNTRY: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
-});
-
-static ENCODING: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alnum:]-]+$").expect("Failed to compile hard-coded regular expression.")
-});
-
-static MODIFIER: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
-});
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct GroupName<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> GroupName<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'n: 'a>(value: Cow<'n, str>) -> Self {
-        GroupName { inner: value }
-    }
-}
-
-impl<'a> From<GroupName<'a>> for Cow<'a, str> {
-    fn from(value: GroupName<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for GroupName<'a> {
-    type Error = InvalidGroupName;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        if !GROUPNAME.is_match(&value) {
-            return Err(InvalidGroupName);
-        }
-
-        Ok(GroupName { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for GroupName<'a> {
-    type Error = InvalidGroupName;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        GroupName::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for GroupName<'a> {
-    type Error = InvalidGroupName;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        GroupName::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Key<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Key<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
-        Key { inner: value }
-    }
-}
-
-impl<'a> From<Key<'a>> for Cow<'a, str> {
-    #[inline(always)]
-    fn from(value: Key<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Key<'a> {
-    type Error = InvalidKey;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if !c.is_ascii() {
-                return Err(InvalidKey::NotAscii);
-            }
-            if !c.is_alphanumeric() && c != '-' {
-                return Err(InvalidKey::NotAlphanumeric);
-            }
-        }
-
-        Ok(Key { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Key<'a> {
-    type Error = InvalidKey;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Key::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Key<'a> {
-    type Error = InvalidKey;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Key::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Language<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Language<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
-        Language { inner: value }
-    }
-}
-
-impl<'a> From<Language<'a>> for Cow<'a, str> {
-    fn from(value: Language<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Language<'a> {
-    type Error = InvalidLanguage;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        if !LANGUAGE.is_match(&value) {
-            return Err(InvalidLanguage);
-        }
-
-        Ok(Language { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Language<'a> {
-    type Error = InvalidLanguage;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Language::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Language<'a> {
-    type Error = InvalidLanguage;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Language::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Country<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Country<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
-        Country { inner: value }
-    }
-}
-
-impl<'a> From<Country<'a>> for Cow<'a, str> {
-    fn from(value: Country<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Country<'a> {
-    type Error = InvalidCountry;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        if !COUNTRY.is_match(&value) {
-            return Err(InvalidCountry);
-        }
-
-        Ok(Country { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Country<'a> {
-    type Error = InvalidCountry;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Country::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Country<'a> {
-    type Error = InvalidCountry;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Country::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Encoding<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Encoding<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
-        Encoding { inner: value }
-    }
-}
-
-impl<'a> From<Encoding<'a>> for Cow<'a, str> {
-    fn from(value: Encoding<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Encoding<'a> {
-    type Error = InvalidEncoding;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        if !ENCODING.is_match(&value) {
-            return Err(InvalidEncoding);
-        }
-
-        Ok(Encoding { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Encoding<'a> {
-    type Error = InvalidEncoding;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Encoding::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Encoding<'a> {
-    type Error = InvalidEncoding;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Encoding::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Modifier<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Modifier<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
-        Modifier { inner: value }
-    }
-}
-
-impl<'a> From<Modifier<'a>> for Cow<'a, str> {
-    fn from(value: Modifier<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Modifier<'a> {
-    type Error = InvalidModifier;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        if !MODIFIER.is_match(&value) {
-            return Err(InvalidModifier);
-        }
-
-        Ok(Modifier { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Modifier<'a> {
-    type Error = InvalidModifier;
-
-    #[inline(always)]
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Modifier::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Modifier<'a> {
-    type Error = InvalidModifier;
-
-    #[inline(always)]
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Modifier::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Value<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Value<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
-        Value { inner: value }
-    }
-}
-
-impl<'a> From<Value<'a>> for Cow<'a, str> {
-    #[inline(always)]
-    fn from(value: Value<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Value<'a> {
-    type Error = InvalidValue;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if c.is_control() {
-                return Err(InvalidValue::ContainsControlCharacter);
-            }
-            if c == '\n' || c == '\r' {
-                return Err(InvalidValue::ContainsNewline);
-            }
-        }
-
-        Ok(Value { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Value<'a> {
-    type Error = InvalidValue;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Value::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Value<'a> {
-    type Error = InvalidValue;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Value::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Whitespace<'a> {
-    inner: Cow<'a, str>,
-}
-
-impl<'a> Whitespace<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
-        Whitespace { inner: value }
-    }
-}
-
-impl<'a> From<Whitespace<'a>> for Cow<'a, str> {
-    #[inline(always)]
-    fn from(value: Whitespace<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Cow<'a, str>> for Whitespace<'a> {
-    type Error = InvalidWhitespace;
-
-    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if !c.is_ascii_whitespace() {
-                return Err(InvalidWhitespace);
-            }
-        }
-
-        Ok(Whitespace { inner: value })
-    }
-}
-
-impl<'a> TryFrom<&'a str> for Whitespace<'a> {
-    type Error = InvalidWhitespace;
-
-    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        Whitespace::try_from(Cow::Borrowed(value))
-    }
-}
-
-impl<'a> TryFrom<String> for Whitespace<'a> {
-    type Error = InvalidWhitespace;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Whitespace::try_from(Cow::Owned(value))
-    }
-}
-
-// =============================================================================
-
-#[derive(Clone, Debug)]
-pub struct Decor<'a> {
-    inner: Vec<Cow<'a, str>>,
-}
-
-impl<'a> Decor<'a> {
-    #[inline(always)]
-    pub(crate) fn new_unchecked<'v: 'a>(value: Vec<Cow<'a, str>>) -> Self {
-        Decor { inner: value }
-    }
-}
-
-impl<'a> From<Decor<'a>> for Vec<Cow<'a, str>> {
-    #[inline(always)]
-    fn from(value: Decor<'a>) -> Self {
-        value.inner
-    }
-}
-
-impl<'a> TryFrom<Vec<Cow<'a, str>>> for Decor<'a> {
-    type Error = InvalidDecor;
-
-    fn try_from(value: Vec<Cow<'a, str>>) -> Result<Self, Self::Error> {
-        for line in &value {
-            if !line.is_empty() && !line.starts_with('#') {
-                return Err(InvalidDecor);
-            }
-        }
-
-        Ok(Decor { inner: value })
-    }
-}
-
-impl<'a> TryFrom<Vec<&'a str>> for Decor<'a> {
-    type Error = InvalidDecor;
-
-    fn try_from(value: Vec<&'a str>) -> Result<Self, Self::Error> {
-        Decor::try_from(value.into_iter().map(Cow::Borrowed).collect::<Vec<_>>())
-    }
-}
-
-impl<'a> TryFrom<Vec<String>> for Decor<'a> {
-    type Error = InvalidDecor;
-
-    fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
-        Decor::try_from(value.into_iter().map(Cow::Owned).collect::<Vec<_>>())
-    }
-}
-
-// =============================================================================
+use basic::*;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
@@ -534,6 +45,19 @@ impl<'a> KeyValuePair<'a> {
             wsl: wsl.into(),
             wsr: wsr.into(),
             decor: decor.into(),
+        }
+    }
+
+    pub fn into_owned(self) -> KeyValuePair<'static> {
+        let owned_decor = self.decor.into_iter().map(|c| Cow::Owned(c.into_owned())).collect();
+
+        KeyValuePair {
+            key: Cow::Owned(self.key.into_owned()),
+            locale: self.locale.map(Locale::into_owned),
+            value: Cow::Owned(self.value.into_owned()),
+            wsl: Cow::Owned(self.wsl.into_owned()),
+            wsr: Cow::Owned(self.wsr.into_owned()),
+            decor: owned_decor,
         }
     }
 
@@ -627,6 +151,15 @@ impl<'a> Locale<'a> {
         }
     }
 
+    pub fn into_owned(self) -> Locale<'static> {
+        Locale {
+            lang: Cow::Owned(self.lang.into_owned()),
+            country: self.country.map(|c| Cow::Owned(c.into_owned())),
+            encoding: self.encoding.map(|c| Cow::Owned(c.into_owned())),
+            modifier: self.modifier.map(|c| Cow::Owned(c.into_owned())),
+        }
+    }
+
     pub fn get_lang(&self) -> &str {
         &self.lang
     }
@@ -700,6 +233,22 @@ impl<'a> Group<'a> {
             entries,
             decor: decor.into(),
         }
+    }
+
+    pub fn into_owned(self) -> Group<'static> {
+        let owned_name: Cow<'static, str> = Cow::Owned(self.name.into_owned());
+
+        let mut owned = Group::new(GroupName::new_unchecked(owned_name.clone()));
+
+        for (_key, kv) in self.entries {
+            owned.insert(kv.into_owned());
+        }
+
+        for line in self.decor {
+            owned.decor.push(Cow::Owned(line.into_owned()));
+        }
+
+        owned
     }
 
     pub fn get<'k: 'a>(&self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&KeyValuePair> {

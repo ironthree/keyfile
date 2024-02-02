@@ -5,7 +5,11 @@ use indexmap::IndexMap;
 use thiserror::Error;
 
 use crate::parse::{parse_as_header, parse_as_key_value_pair};
-use crate::types::{Decor, Group, GroupName, Key, KeyValuePair, Value, Whitespace};
+use crate::types::{
+    basic::{Decor, GroupName, Key, Value, Whitespace},
+    Group,
+    KeyValuePair,
+};
 
 #[derive(Debug, Error)]
 pub enum KeyFileError {
@@ -109,6 +113,20 @@ impl<'a> KeyFile<'a> {
         }
 
         Ok(KeyFile { groups, decor })
+    }
+
+    pub fn into_owned(self) -> KeyFile<'static> {
+        let mut owned = KeyFile::new();
+
+        for (_group_name, group) in self.groups {
+            owned.insert_group(group.into_owned());
+        }
+
+        for line in self.decor {
+            owned.decor.push(Cow::Owned(line.into_owned()));
+        }
+
+        owned
     }
 
     pub fn get_group(&self, name: &str) -> Option<&Group> {
