@@ -11,13 +11,20 @@ use crate::types::{
     KeyValuePair,
 };
 
+/// Error that is returned when attempting to parse an invalid KeyFile.
 #[derive(Debug, Error)]
 pub enum KeyFileError {
+    /// Error variant for syntax errors.
     #[error("Invalid line (line {}): {}", .lineno, .line)]
+    #[allow(missing_docs)]
     InvalidLine { line: String, lineno: usize },
+    /// Error variant for multiple groups with the same name.
     #[error("Multiple groups with the same name (line {}): {}", .lineno, .name)]
+    #[allow(missing_docs)]
     DuplicateGroup { name: String, lineno: usize },
+    /// Error variant for multiple keys in the same group with the same name.
     #[error("Multiple key-value pairs with the same key (line {}): {}", .lineno, .key)]
+    #[allow(missing_docs)]
     DuplicateKey { key: String, lineno: usize },
 }
 
@@ -35,6 +42,7 @@ impl KeyFileError {
     }
 }
 
+/// Struct representing a parsed KeyFile.
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
     pub(crate) groups: IndexMap<Cow<'a, str>, Group<'a>>,
@@ -42,6 +50,7 @@ pub struct KeyFile<'a> {
 }
 
 impl<'a> KeyFile<'a> {
+    /// Method for creating a new and empty [`KeyFile`].
     pub fn new() -> Self {
         KeyFile {
             groups: IndexMap::new(),
@@ -49,6 +58,7 @@ impl<'a> KeyFile<'a> {
         }
     }
 
+    /// Method for parsing a string into a [`KeyFile`].
     pub fn parse(value: &'a str) -> Result<Self, KeyFileError> {
         let mut current_group: Option<Group> = None;
 
@@ -115,6 +125,8 @@ impl<'a> KeyFile<'a> {
         Ok(KeyFile { groups, decor })
     }
 
+    /// Method for converting a [`KeyFile`] that possibly references borrowed data into
+    /// a [`KeyFile`] with a `'static` lifetime.
     pub fn into_owned(self) -> KeyFile<'static> {
         let mut owned = KeyFile::new();
 
@@ -129,21 +141,37 @@ impl<'a> KeyFile<'a> {
         owned
     }
 
+    /// Method for getting a reference to the [`Group`] with the given name.
+    ///
+    /// If there is no group with the given name, then [`None`] is returned.
     pub fn get_group(&self, name: &str) -> Option<&Group> {
         self.groups.get(name)
     }
 
+    /// Method for getting a mutable reference to the [`Group`] with the given name.
+    ///
+    /// If there is no group with the given name, then [`None`] is returned.
     pub fn get_group_mut(&'a mut self, name: &str) -> Option<&mut Group> {
         self.groups.get_mut(name)
     }
 
+    /// Method for inserting a new [`Group`] into the [`KeyFile`].
+    ///
+    /// The group will be appended as the last group in the [`KeyFile`].
+    ///
+    /// Inserting a group with the same name as an already existing group will
+    /// replace the existing group. In this case, the replaced group is returned.
     pub fn insert_group<'g: 'a>(&mut self, group: Group<'g>) -> Option<Group> {
         // This clone is cheap only if the group.name is a Cow::Borrowed(&str).
         // If group.name is a Cow::Owned(String), the String needs to be copied.
         self.groups.insert(group.name.clone(), group)
     }
 
-    // This method preserves order by calling the order-preserving IndexMap::shift_remove method.
+    /// Method for removing a [`Group`] with the given name.
+    ///
+    /// If there is no group with the given name, then [`None`] is returned.
+    ///
+    /// This operation preserves the order of remaining groups.
     pub fn remove_group(&mut self, name: &str) -> Option<Group> {
         self.groups.shift_remove(name)
     }

@@ -7,7 +7,7 @@ use super::errors::*;
 
 static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
     // keep in sync with src/parse.rs:HEADER
-    Regex::new(r"^[[:print:][^\[\]]]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(r"^[[:print:]&&[^\[\]]]+$").expect("Failed to compile hard-coded regular expression.")
 });
 
 static LANGUAGE: Lazy<Regex> = Lazy::new(|| {
@@ -30,8 +30,25 @@ static MODIFIER: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
 });
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid group names.
+///
+/// New instances of `GroupName` can only be created from strings that are valid group names:
+///
+/// ```
+/// use keyfile::types::basic::GroupName;
+///
+/// let group = GroupName::try_from("hello").unwrap();
+/// let error = GroupName::try_from("[[[[[").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::GroupName;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = GroupName::try_from("hello").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct GroupName<'a> {
     inner: Cow<'a, str>,
@@ -80,8 +97,25 @@ impl<'a> TryFrom<String> for GroupName<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid keys.
+///
+/// New instances of `Key` can only be created from strings that are valid key names:
+///
+/// ```
+/// use keyfile::types::basic::Key;
+///
+/// let key = Key::try_from("hello").unwrap();
+/// let error = Key::try_from("//!!/").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Key;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Key::try_from("hello").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Key<'a> {
     inner: Cow<'a, str>,
@@ -136,8 +170,25 @@ impl<'a> TryFrom<String> for Key<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid language identifiers.
+///
+/// New instances of `Language` can only be created from strings that are valid POSIX locale language identifiers:
+///
+/// ```
+/// use keyfile::types::basic::Language;
+///
+/// let lang = Language::try_from("de").unwrap();
+/// let error = Language::try_from("42").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Language;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Language::try_from("de").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Language<'a> {
     inner: Cow<'a, str>,
@@ -186,8 +237,26 @@ impl<'a> TryFrom<String> for Language<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid country identifiers.
+///
+/// New instances of `Country` can only be created from strings that are valid POSIX locale country / terretory
+/// identifiers:
+///
+/// ```
+/// use keyfile::types::basic::Country;
+///
+/// let country = Country::try_from("DE").unwrap();
+/// let error = Country::try_from("!!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Country;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Country::try_from("EN").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Country<'a> {
     inner: Cow<'a, str>,
@@ -236,8 +305,25 @@ impl<'a> TryFrom<String> for Country<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid encoding identifiers.
+///
+/// New instances of `Encoding` can only be created from strings that are valid POSIX locale encoding identifiers:
+///
+/// ```
+/// use keyfile::types::basic::Encoding;
+///
+/// let encoding = Encoding::try_from("utf8").unwrap();
+/// let error = Encoding::try_from("morse!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Encoding;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Encoding::try_from("iso88591").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Encoding<'a> {
     inner: Cow<'a, str>,
@@ -286,8 +372,25 @@ impl<'a> TryFrom<String> for Encoding<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid locale modifiers.
+///
+/// New instances of `Encoding` can only be created from strings that are valid POSIX locale modifiers:
+///
+/// ```
+/// use keyfile::types::basic::Modifier;
+///
+/// let modifier = Modifier::try_from("latin").unwrap();
+/// let error = Modifier::try_from("!foo!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Modifier;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Modifier::try_from("cyrillic").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Modifier<'a> {
     inner: Cow<'a, str>,
@@ -336,8 +439,25 @@ impl<'a> TryFrom<String> for Modifier<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid values.
+///
+/// New instances of `Value` can only be created from strings that are valid value strings:
+///
+/// ```
+/// use keyfile::types::basic::Value;
+///
+/// let value = Value::try_from("WORLD").unwrap();
+/// let error = Value::try_from("new\nline").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Value;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Value::try_from("WORLD").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Value<'a> {
     inner: Cow<'a, str>,
@@ -390,8 +510,26 @@ impl<'a> TryFrom<String> for Value<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid whitespace.
+///
+/// New instances of `Whitespace` can only be created from strings that are valid whitespace
+/// (i.e. spaces / tabs surrounding the `=` character in a key-value pair):
+///
+/// ```
+/// use keyfile::types::basic::Whitespace;
+///
+/// let whitespace = Whitespace::try_from(" ").unwrap();
+/// let error = Whitespace::try_from("HELLO").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Whitespace;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Whitespace::try_from("\t").unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Whitespace<'a> {
     inner: Cow<'a, str>,
@@ -441,8 +579,26 @@ impl<'a> TryFrom<String> for Whitespace<'a> {
     }
 }
 
-// =============================================================================
-
+/// Newtype struct wrapping strings that are valid comments and / or empty lines.
+///
+/// New instances of `Decor` can only be created from strings that are valid comment lines
+/// (a `#` character followed by an arbitrary string of UTF-8) or empty lines:
+///
+/// ```
+/// use keyfile::types::basic::Decor;
+///
+/// let decor = Decor::try_from(vec!["# This is a comment"]).unwrap();
+/// let error = Decor::try_from(vec!["This=is not a comment"]).unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::basic::Decor;
+/// use std::borrow::Cow;
+///
+/// let inner: Vec<Cow<str>> = Decor::try_from(vec![""]).unwrap().into();
+/// ```
 #[derive(Clone, Debug)]
 pub struct Decor<'a> {
     inner: Vec<Cow<'a, str>>,
