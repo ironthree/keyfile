@@ -1,5 +1,6 @@
-use keyfile::types::{Group, KeyValuePair};
-use keyfile::KeyFile;
+#![allow(missing_docs)]
+
+use keyfile::{Group, KeyFile, KeyValuePair};
 
 fn main() -> anyhow::Result<()> {
     let kv1 = KeyValuePair::new_with_decor(

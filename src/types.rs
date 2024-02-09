@@ -1,167 +1,696 @@
-//! ## Implementations of the building blocks of KeyFiles
+//! ## Implementations of the fundamental data types of KeyFiles
 //!
-//! This module contains the definitions of [`KeyValuePair`], [`Group`], and [`Locale`], built on top of the fundamental
-//! data types from the [`basic`] module.
+//! This module defines wrapper types for strings that can only hold valid values by construction:
 //!
-//! - [`KeyValuePair`]: key-value pair ("entry")
-//! - [`Group`]: group name ("header") and collection of key-value pairs ("entries")
-//! - [`Locale`]: key modifier in key-value pairs for translated values
+//! - [`GroupName`]: printable ASCII characters except `[` and `]`
+//! - [`Key`]: alphanumeric ASCII characters and the `-` character
+//! - [`Language`]: alphabetic ASCII characters
+//! - [`Country`]: alphabetic ASCII characters
+//! - [`Encoding`]: alphanumeric ASCII characters and the `-` character
+//! - [`Modifier`]: alphabetic ASCII characters
+//! - [`Value`]: no control characters (including `\n` and `\r`)
+//! - [`Whitespace`]: space characters (` `) and / or TAB characters (`\t`)
+//! - [`Decor`]: list of strings that are either empty or start with the `#` character
 //!
-//! The definitions of both [`KeyValuePair`] and [`Group`] include format-preserving representations of whitespace and
-//! preceding comments and / or empty lines.
+//!
+//! Additionally, this module contains the definition of [`Locale`], which is a composite of [`Language`], [`Country`]
+//! (optional), [`Encoding`] (optional), and [`Modifier`] (optional).
+//!
+//! These implementations should match the basic file format as described in the [Desktop Entry Specification].
+//!
+//! [Desktop Entry Specification]: https://specifications.freedesktop.org/desktop-entry-spec/latest/
 
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
 
-use indexmap::IndexMap;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
-pub mod basic;
-pub mod errors;
+pub(crate) const REGEX_ERROR: &str = "Failed to compile hard-coded regular expression.";
 
-use basic::*;
+pub(crate) const GROUPNAME_REGEX: &str = r"[[:print:]&&[^\[\]]]+";
+pub(crate) const KEY_REGEX: &str = r"[[:alnum:]-]+";
+pub(crate) const LANGUAGE_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const COUNTRY_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const ENCODING_REGEX: &str = r"[[:alnum:]-]+";
+pub(crate) const MODIFIER_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const VALUE_REGEX: &str = r"[^[:cntrl:]]*";
+pub(crate) const WHITESPACE_REGEX: &str = r"[[:blank:]]*";
 
-/// ## Key-value pair and its associated data
+static GROUPNAME: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{GROUPNAME_REGEX}$")).expect(REGEX_ERROR));
+static KEY: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{KEY_REGEX}$")).expect(REGEX_ERROR));
+static LANGUAGE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{LANGUAGE_REGEX}$")).expect(REGEX_ERROR));
+static COUNTRY: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{COUNTRY_REGEX}$")).expect(REGEX_ERROR));
+static ENCODING: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{ENCODING_REGEX}$")).expect(REGEX_ERROR));
+static MODIFIER: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{MODIFIER_REGEX}$")).expect(REGEX_ERROR));
+static VALUE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{VALUE_REGEX}$")).expect(REGEX_ERROR));
+static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{WHITESPACE_REGEX}$")).expect(REGEX_ERROR));
+
+/// ## Error that is returned when attempting to initialize a type with an invalid input for that type
 ///
-/// This includes format-preserving representations of preceding comment lines, empty lines,
-/// and whitespace around the `=` separator character.
-#[derive(Clone, Debug, PartialEq)]
-pub struct KeyValuePair<'a> {
-    pub(crate) key: Cow<'a, str>,
-    pub(crate) locale: Option<Locale<'a>>,
-    pub(crate) value: Cow<'a, str>,
-    pub(crate) wsl: Cow<'a, str>,
-    pub(crate) wsr: Cow<'a, str>,
-    pub(crate) decor: Vec<Cow<'a, str>>,
+/// The newtype wrappers in this module ensure that only valid strings can be used for manually building keyfiles.
+/// Attempting to construct a type from a string that is invalid for that specific type will yield one of the variants
+/// of this error.
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidString {
+    /// An invalid string was passed to [`GroupName::try_from`]
+    #[error("Invalid group name: may only contain printable ASCII, except for the '[' and ']' characters")]
+    GroupName,
+    /// An invalid string was passed to [`Key::try_from`]
+    #[error("Invalid key name: may only contain alphanumeric ASCII characters and the '-' character")]
+    Key,
+    /// An invalid string was passed to [`Language::try_from`]
+    #[error("Invalid lanugage: may only contain alphabetic ASCII characters")]
+    Language,
+    /// An invalid string was passed to [`Country::try_from`]
+    #[error("Invalid country: may only contaun alphabetic ASCII characters")]
+    Country,
+    /// An invalid string was passed to [`Encoding::try_from`]
+    #[error("Invalid encoding: may only contain alphanumeric ASCII characters and the '-' character")]
+    Encoding,
+    /// An invalid string was passed to [`Modifier::try_from`]
+    #[error("Invalid modifier: may only contain alphabetic ASCII characters")]
+    Modifier,
+    /// An invalid string was passed to [`Value::try_from`]
+    #[error("Invalid value: may not contain control characters")]
+    Value,
+    /// An invalid string was passed to [`Whitespace::try_from`]
+    #[error("Invalid whitespace: may only contain space (' ') or tab ('\t')")]
+    Whitespace,
+    /// An invalid list of strings was passed to [`Decor::try_from`]
+    #[error("Invalid decor: may only contain empty strings or strings that start with the '#' character")]
+    Decor,
 }
 
-impl<'a> KeyValuePair<'a> {
-    /// Method to construct a new plain key-value pair
-    pub fn new<'kv: 'a>(key: Key<'kv>, locale: Option<Locale<'kv>>, value: Value<'kv>) -> Self {
-        KeyValuePair {
-            key: key.into(),
-            locale,
-            value: value.into(),
-            wsl: " ".into(),
-            wsr: " ".into(),
-            decor: Vec::new(),
-        }
-    }
+/// ## Newtype struct wrapping strings that are valid group names
+///
+/// New instances of `GroupName` can only be created from strings that are valid group names:
+///
+/// ```
+/// use keyfile::types::GroupName;
+///
+/// let group = GroupName::try_from("hello").unwrap();
+/// let error = GroupName::try_from("[[[[[").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::GroupName;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = GroupName::try_from("hello").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct GroupName<'a> {
+    inner: Cow<'a, str>,
+}
 
-    /// Method to construct a new key-value pair with explicitly set whitespace and decor
-    pub fn new_with_decor<'kv: 'a>(
-        key: Key<'kv>,
-        locale: Option<Locale<'kv>>,
-        value: Value<'kv>,
-        wsl: Whitespace<'kv>,
-        wsr: Whitespace<'kv>,
-        decor: Decor<'kv>,
-    ) -> Self {
-        KeyValuePair {
-            key: key.into(),
-            locale,
-            value: value.into(),
-            wsl: wsl.into(),
-            wsr: wsr.into(),
-            decor: decor.into(),
-        }
-    }
-
-    /// Method for converting a [`KeyValuePair`] that possibly references borrowed data into
-    /// a [`KeyValuePair`] with a `'static` lifetime
-    pub fn into_owned(self) -> KeyValuePair<'static> {
-        let owned_decor = self.decor.into_iter().map(|c| Cow::Owned(c.into_owned())).collect();
-
-        KeyValuePair {
-            key: Cow::Owned(self.key.into_owned()),
-            locale: self.locale.map(Locale::into_owned),
-            value: Cow::Owned(self.value.into_owned()),
-            wsl: Cow::Owned(self.wsl.into_owned()),
-            wsr: Cow::Owned(self.wsr.into_owned()),
-            decor: owned_decor,
-        }
-    }
-
-    /// Method for getting the key string
-    pub fn get_key(&self) -> &str {
-        &self.key
-    }
-
-    /// Method for setting the key string
-    ///
-    /// The replaced key string is returned.
-    pub fn set_key<'k: 'a>(&mut self, key: Key<'k>) -> Cow<str> {
-        std::mem::replace(&mut self.key, key.into())
-    }
-
-    /// Method for getting the optional locale string
-    pub fn get_locale(&self) -> Option<&Locale> {
-        self.locale.as_ref()
-    }
-
-    /// Method for setting the optional locale string
-    ///
-    /// If this method replaces an existing locale string, it is returned.
-    pub fn set_locale<'l: 'a>(&mut self, locale: Locale<'l>) -> Option<Locale<'a>> {
-        std::mem::replace(&mut self.locale, Some(locale))
-    }
-
-    /// Method for getting the value string
-    pub fn get_value(&self) -> &str {
-        &self.value
-    }
-
-    /// Method for setting the value string
-    ///
-    /// The replaced value string is returned.
-    pub fn set_value<'v: 'a>(&mut self, value: Value<'v>) -> Cow<str> {
-        std::mem::replace(&mut self.value, value.into())
-    }
-
-    /// Method for getting the whitespace surrounding the `=` separator
-    pub fn get_whitespace(&self) -> (&str, &str) {
-        (&self.wsl, &self.wsr)
-    }
-
-    /// Method for setting the whitespace surrounding the `=` separator
-    ///
-    /// The replaced strings are returned.
-    pub fn set_whitespace<'w: 'a>(&mut self, wsl: Whitespace<'w>, wsr: Whitespace<'w>) -> (Cow<str>, Cow<str>) {
-        (
-            std::mem::replace(&mut self.wsl, wsl.into()),
-            std::mem::replace(&mut self.wsr, wsr.into()),
-        )
-    }
-
-    /// Method for getting the comment lines / empty lines preceding the [`KeyValuePair`]
-    pub fn get_decor(&self) -> &[Cow<str>] {
-        self.decor.as_slice()
-    }
-
-    /// Method for setting the comment lines / empty lines preceding the [`KeyValuePair`]
-    ///
-    /// The replaced strings are returned.
-    pub fn set_decor<'d: 'a>(&mut self, decor: Decor<'d>) -> Vec<Cow<str>> {
-        std::mem::replace(&mut self.decor, decor.into())
+impl<'a> GroupName<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'n: 'a>(value: Cow<'n, str>) -> Self {
+        GroupName { inner: value }
     }
 }
 
-impl<'a> Display for KeyValuePair<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for line in &self.decor {
-            writeln!(f, "{}", line)?;
-        }
-
-        if let Some(locale) = &self.locale {
-            write!(f, "{}[{}]{}={}{}", self.key, locale, self.wsl, self.wsr, self.value)?;
-        } else {
-            write!(f, "{}{}={}{}", self.key, self.wsl, self.wsr, self.value)?;
-        }
-
-        Ok(())
+impl<'a> From<GroupName<'a>> for Cow<'a, str> {
+    fn from(value: GroupName<'a>) -> Self {
+        value.inner
     }
 }
 
-/// ## Locale identifier
+impl<'a> TryFrom<Cow<'a, str>> for GroupName<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !GROUPNAME.is_match(&value) {
+            return Err(InvalidString::GroupName);
+        }
+
+        Ok(GroupName { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for GroupName<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        GroupName::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for GroupName<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        GroupName::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid keys
+///
+/// New instances of `Key` can only be created from strings that are valid key names:
+///
+/// ```
+/// use keyfile::types::Key;
+///
+/// let key = Key::try_from("hello").unwrap();
+/// let error = Key::try_from("//!!/").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Key;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Key::try_from("hello").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Key<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Key<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Key { inner: value }
+    }
+}
+
+impl<'a> From<Key<'a>> for Cow<'a, str> {
+    #[inline(always)]
+    fn from(value: Key<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Key<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !KEY.is_match(&value) {
+            return Err(InvalidString::Key);
+        }
+
+        Ok(Key { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Key<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Key::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Key<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Key::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid language identifiers
+///
+/// New instances of `Language` can only be created from strings that are valid POSIX locale language identifiers:
+///
+/// ```
+/// use keyfile::types::Language;
+///
+/// let lang = Language::try_from("de").unwrap();
+/// let error = Language::try_from("42").unwrap_err();
+/// ```
+///
+/// The inner string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Language;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Language::try_from("de").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Language<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Language<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Language { inner: value }
+    }
+}
+
+impl<'a> From<Language<'a>> for Cow<'a, str> {
+    fn from(value: Language<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Language<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !LANGUAGE.is_match(&value) {
+            return Err(InvalidString::Language);
+        }
+
+        Ok(Language { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Language<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Language::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Language<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Language::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid country identifiers
+///
+/// New instances of `Country` can only be created from strings that are valid POSIX locale country / territory
+/// identifiers:
+///
+/// ```
+/// use keyfile::types::Country;
+///
+/// let country = Country::try_from("DE").unwrap();
+/// let error = Country::try_from("!!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Country;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Country::try_from("EN").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Country<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Country<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Country { inner: value }
+    }
+}
+
+impl<'a> From<Country<'a>> for Cow<'a, str> {
+    fn from(value: Country<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Country<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !COUNTRY.is_match(&value) {
+            return Err(InvalidString::Country);
+        }
+
+        Ok(Country { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Country<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Country::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Country<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Country::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid encoding identifiers
+///
+/// New instances of `Encoding` can only be created from strings that are valid POSIX locale encoding identifiers:
+///
+/// ```
+/// use keyfile::types::Encoding;
+///
+/// let encoding = Encoding::try_from("utf8").unwrap();
+/// let error = Encoding::try_from("morse!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Encoding;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Encoding::try_from("iso88591").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Encoding<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Encoding<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Encoding { inner: value }
+    }
+}
+
+impl<'a> From<Encoding<'a>> for Cow<'a, str> {
+    fn from(value: Encoding<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Encoding<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !ENCODING.is_match(&value) {
+            return Err(InvalidString::Encoding);
+        }
+
+        Ok(Encoding { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Encoding<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Encoding::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Encoding<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Encoding::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid locale modifiers
+///
+/// New instances of `Encoding` can only be created from strings that are valid POSIX locale modifiers:
+///
+/// ```
+/// use keyfile::types::Modifier;
+///
+/// let modifier = Modifier::try_from("latin").unwrap();
+/// let error = Modifier::try_from("!foo!").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Modifier;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Modifier::try_from("cyrillic").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Modifier<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Modifier<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Modifier { inner: value }
+    }
+}
+
+impl<'a> From<Modifier<'a>> for Cow<'a, str> {
+    fn from(value: Modifier<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Modifier<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !MODIFIER.is_match(&value) {
+            return Err(InvalidString::Modifier);
+        }
+
+        Ok(Modifier { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Modifier<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Modifier::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Modifier<'a> {
+    type Error = InvalidString;
+
+    #[inline(always)]
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Modifier::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid values
+///
+/// New instances of `Value` can only be created from strings that are valid value strings:
+///
+/// ```
+/// use keyfile::types::Value;
+///
+/// let value = Value::try_from("WORLD").unwrap();
+/// let error = Value::try_from("new\nline").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Value;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Value::try_from("WORLD").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Value<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Value<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'a, str>) -> Self {
+        Value { inner: value }
+    }
+}
+
+impl<'a> From<Value<'a>> for Cow<'a, str> {
+    #[inline(always)]
+    fn from(value: Value<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Value<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !VALUE.is_match(&value) {
+            return Err(InvalidString::Value);
+        }
+
+        Ok(Value { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Value<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Value::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Value<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Value::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid whitespace
+///
+/// New instances of `Whitespace` can only be created from strings that are valid whitespace
+/// (i.e. spaces / tabs surrounding the `=` character in a key-value pair):
+///
+/// ```
+/// use keyfile::types::Whitespace;
+///
+/// let whitespace = Whitespace::try_from(" ").unwrap();
+/// let error = Whitespace::try_from("HELLO").unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Whitespace;
+/// use std::borrow::Cow;
+///
+/// let inner: Cow<str> = Whitespace::try_from("\t").unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Whitespace<'a> {
+    inner: Cow<'a, str>,
+}
+
+impl<'a> Whitespace<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Cow<'v, str>) -> Self {
+        Whitespace { inner: value }
+    }
+}
+
+impl<'a> From<Whitespace<'a>> for Cow<'a, str> {
+    #[inline(always)]
+    fn from(value: Whitespace<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Cow<'a, str>> for Whitespace<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
+        if !WHITESPACE.is_match(&value) {
+            return Err(InvalidString::Whitespace);
+        }
+
+        Ok(Whitespace { inner: value })
+    }
+}
+
+impl<'a> TryFrom<&'a str> for Whitespace<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        Whitespace::try_from(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> TryFrom<String> for Whitespace<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Whitespace::try_from(Cow::Owned(value))
+    }
+}
+
+/// ## Newtype struct wrapping strings that are valid comments and / or empty lines
+///
+/// New instances of `Decor` can only be created from strings that are valid comment lines
+/// (a `#` character followed by an arbitrary string of UTF-8) or empty lines:
+///
+/// ```
+/// use keyfile::types::Decor;
+///
+/// let decor = Decor::try_from(vec!["# This is a comment"]).unwrap();
+/// let error = Decor::try_from(vec!["This=is not a comment"]).unwrap_err();
+/// ```
+///
+/// The contained string can always be obtained by using the [`From::from`] method:
+///
+/// ```
+/// use keyfile::types::Decor;
+/// use std::borrow::Cow;
+///
+/// let inner: Vec<Cow<str>> = Decor::try_from(vec![""]).unwrap().into();
+/// ```
+#[derive(Clone, Debug)]
+pub struct Decor<'a> {
+    inner: Vec<Cow<'a, str>>,
+}
+
+impl<'a> Decor<'a> {
+    #[inline(always)]
+    pub(crate) fn new_unchecked<'v: 'a>(value: Vec<Cow<'a, str>>) -> Self {
+        Decor { inner: value }
+    }
+}
+
+impl<'a> From<Decor<'a>> for Vec<Cow<'a, str>> {
+    #[inline(always)]
+    fn from(value: Decor<'a>) -> Self {
+        value.inner
+    }
+}
+
+impl<'a> TryFrom<Vec<Cow<'a, str>>> for Decor<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Vec<Cow<'a, str>>) -> Result<Self, Self::Error> {
+        for line in &value {
+            if !line.is_empty() && !line.starts_with('#') {
+                return Err(InvalidString::Decor);
+            }
+        }
+
+        Ok(Decor { inner: value })
+    }
+}
+
+impl<'a> TryFrom<Vec<&'a str>> for Decor<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Vec<&'a str>) -> Result<Self, Self::Error> {
+        Decor::try_from(value.into_iter().map(Cow::Borrowed).collect::<Vec<_>>())
+    }
+}
+
+impl<'a> TryFrom<Vec<String>> for Decor<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: Vec<String>) -> Result<Self, Self::Error> {
+        Decor::try_from(value.into_iter().map(Cow::Owned).collect::<Vec<_>>())
+    }
+}
+
+/// ## Locale identifier (language, country / territory, encoding, and modifier)
+///
+/// This struct represents a locale identifier as used on UNIX / POSIX systems.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Locale<'a> {
     pub(crate) lang: Cow<'a, str>,
@@ -258,107 +787,6 @@ impl<'a> Display for Locale<'a> {
 
         if let Some(modifier) = &self.modifier {
             write!(f, "@{}", modifier)?;
-        }
-
-        Ok(())
-    }
-}
-
-/// ## Named group of key-value pairs and its associated data
-///
-/// This includes a format-preserving representation of preceding comment lines and empty lines.
-#[derive(Clone, Debug)]
-pub struct Group<'a> {
-    pub(crate) name: Cow<'a, str>,
-    pub(crate) entries: IndexMap<(Cow<'a, str>, Option<Locale<'a>>), KeyValuePair<'a>>,
-    pub(crate) decor: Vec<Cow<'a, str>>,
-}
-
-impl<'a> Group<'a> {
-    /// Method for creating a new and empty [`Group`]
-    pub fn new<'e: 'a>(name: GroupName<'e>) -> Self {
-        Group {
-            name: name.into(),
-            entries: IndexMap::new(),
-            decor: Vec::new(),
-        }
-    }
-
-    pub(crate) fn from_entries<'e: 'a>(
-        name: GroupName<'e>,
-        entries: IndexMap<(Cow<'e, str>, Option<Locale<'e>>), KeyValuePair<'e>>,
-        decor: Decor<'e>,
-    ) -> Self {
-        Group {
-            name: name.into(),
-            entries,
-            decor: decor.into(),
-        }
-    }
-
-    /// Method for converting a [`Group`] that possibly references borrowed data into
-    /// a [`Group`] with a `'static` lifetime
-    pub fn into_owned(self) -> Group<'static> {
-        let owned_name: Cow<'static, str> = Cow::Owned(self.name.into_owned());
-
-        let mut owned = Group::new(GroupName::new_unchecked(owned_name.clone()));
-
-        for (_key, kv) in self.entries {
-            owned.insert(kv.into_owned());
-        }
-
-        for line in self.decor {
-            owned.decor.push(Cow::Owned(line.into_owned()));
-        }
-
-        owned
-    }
-
-    /// Method for getting a reference to the [`KeyValuePair`] associated with the given key
-    ///
-    /// If there is no key-value pair associated with the given key, then [`None`] is returned.
-    pub fn get<'k: 'a>(&self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&KeyValuePair> {
-        self.entries.get(&(key.into(), locale))
-    }
-
-    /// Method for getting a mutable reference to the [`KeyValuePair`] associated with the given key
-    ///
-    /// If there is no key-value pair associated with the given key, then [`None`] is returned.
-    pub fn get_mut<'k: 'a>(&'a mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&mut KeyValuePair> {
-        self.entries.get_mut(&(key.into(), locale))
-    }
-
-    /// Method for inserting a new [`KeyValuePair`] into the [`Group`]
-    ///
-    /// The key-value pair will be appended as the last entry in the [`Group`].
-    ///
-    /// Inserting a key-value pair with the same key as an already existing key-value pair will
-    /// replace the existing key-value pair. In this case, the replaced value is returned.
-    pub fn insert<'kv: 'a>(&mut self, kv: KeyValuePair<'kv>) -> Option<KeyValuePair> {
-        // This clone is cheap only if the kv.key is a Cow::Borrowed(&str).
-        // If kv.key is a Cow::Owned(String), the String needs to be copied.
-        self.entries.insert((kv.key.clone(), kv.locale.clone()), kv)
-    }
-
-    /// Method for removing a [`KeyValuePair`] associated with the given key
-    ///
-    /// If there is no key-value pair associated with the given key, then [`None`] is returned.
-    ///
-    /// This operation preserves the order of remaining key-value pairs.
-    pub fn remove<'k: 'a>(&mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<KeyValuePair> {
-        self.entries.shift_remove(&(key.into(), locale))
-    }
-}
-
-impl<'a> Display for Group<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for line in &self.decor {
-            writeln!(f, "{}", line)?;
-        }
-        writeln!(f, "[{}]", self.name)?;
-
-        for kv in self.entries.values() {
-            writeln!(f, "{}", kv)?;
         }
 
         Ok(())

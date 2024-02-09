@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use keyfile::KeyFile;
 
 use std::env::args;

@@ -3,8 +3,7 @@ use std::borrow::Cow;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::types::basic::*;
-use crate::types::Locale;
+use crate::types::*;
 
 static HEADER: Lazy<Regex> = Lazy::new(|| {
     // group header:
