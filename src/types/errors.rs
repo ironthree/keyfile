@@ -8,14 +8,8 @@ pub struct InvalidGroupName;
 
 /// Error that is returned when attempting to construct a [`Key`] from an invalid string.
 #[derive(Debug, thiserror::Error)]
-pub enum InvalidKey {
-    /// Error variant for non-ASCII strings.
-    #[error("Invalid Key: keys must be ASCII-only")]
-    NotAscii,
-    /// Error variant for non-alphanumeric strings.
-    #[error("Invalid Key: keys can only contain alphanumeric characters and hyphens")]
-    NotAlphanumeric,
-}
+#[error("Invalid Key: keys can only contain alphanumeric ASCII characters and hyphens")]
+pub struct InvalidKey;
 
 /// Error that is returned when attempting to construct a [`Language`] from an invalid string.
 #[derive(Debug, thiserror::Error)]
@@ -39,14 +33,8 @@ pub struct InvalidModifier;
 
 /// Error that is returned when attempting to construct a [`Value`] from an invalid string.
 #[derive(Debug, thiserror::Error)]
-pub enum InvalidValue {
-    /// Error variant for strings that contain control characters.
-    #[error("Invalid Value: values cannot contain control characters")]
-    ContainsControlCharacter,
-    /// Error variant for strings that span multiple lines.
-    #[error("Invalid Value: values cannot span multiple lines")]
-    ContainsNewline,
-}
+#[error("Invalid Value: values cannot contain control characters")]
+pub struct InvalidValue;
 
 /// Error that is returned when attempting to construct a [`Whitespace`] from an invalid string.
 #[derive(Debug, thiserror::Error)]

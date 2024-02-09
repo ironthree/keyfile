@@ -1,3 +1,21 @@
+//! Implementations of the basic elements of KeyFiles
+//!
+//! This includes wrapper types for strings that can only hold valid values by construction:
+//!
+//! - [`GroupName`]: printable ASCII characters except `[` and `]`
+//! - [`Key`]: alphanumeric ASCII characters and the `-` character
+//! - [`Language`]: alphabetic ASCII characters
+//! - [`Country`]: alphabetic ASCII characters
+//! - [`Encoding`]: alphanumeric ASCII characters and the `-` character
+//! - [`Modifier`]: alphabetic ASCII characters
+//! - [`Value`]: no control characters (including `\n` and `\r`)
+//! - [`Whitespace`]: space characters (` `) and / or TAB characters (`\t`)
+//! - [`Decor`]: list of strings that are either empty or start with the `#` character
+//!
+//! These implementations should match the basic file format as described in the [Desktop Entry Speciﬁcation].
+//!
+//! [Desktop Entry Speciﬁcation]: https://specifications.freedesktop.org/desktop-entry-spec/latest/
+
 use std::borrow::Cow;
 
 use once_cell::sync::Lazy;
@@ -5,29 +23,47 @@ use regex::Regex;
 
 use super::errors::*;
 
+pub(crate) const REGEX_ERROR: &str = "Failed to compile hard-coded regular expression.";
+
+pub(crate) const GROUPNAME_REGEX: &str = r"[[:print:]&&[^\[\]]]+";
+pub(crate) const KEY_REGEX: &str = r"[[:alnum:]-]+";
+pub(crate) const LANGUAGE_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const COUNTRY_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const ENCODING_REGEX: &str = r"[[:alnum:]-]+";
+pub(crate) const MODIFIER_REGEX: &str = r"[[:alpha:]]+";
+pub(crate) const VALUE_REGEX: &str = r"[^[:cntrl:]]*";
+pub(crate) const WHITESPACE_REGEX: &str = r"[[:blank:]]*";
+
 static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:HEADER
-    Regex::new(r"^[[:print:]&&[^\[\]]]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^{GROUPNAME_REGEX}$")).expect(REGEX_ERROR)
+});
+
+static KEY: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(r"^{KEY_REGEX}$")).expect(REGEX_ERROR)
 });
 
 static LANGUAGE: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^{LANGUAGE_REGEX}$")).expect(REGEX_ERROR)
 });
 
 static COUNTRY: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^{COUNTRY_REGEX}$")).expect(REGEX_ERROR)
 });
 
 static ENCODING: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alnum:]-]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^{ENCODING_REGEX}$")).expect(REGEX_ERROR)
 });
 
 static MODIFIER: Lazy<Regex> = Lazy::new(|| {
-    // keep in sync with src/parse.rs:KEY_VALUE_PAIR
-    Regex::new(r"^[[:alpha:]]+$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^{MODIFIER_REGEX}$")).expect(REGEX_ERROR)
+});
+
+static VALUE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(r"^{VALUE_REGEX}$")).expect(REGEX_ERROR)
+});
+
+static WHITESPACE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(r"^{WHITESPACE_REGEX}$")).expect(REGEX_ERROR)
 });
 
 /// Newtype struct wrapping strings that are valid group names.
@@ -139,13 +175,8 @@ impl<'a> TryFrom<Cow<'a, str>> for Key<'a> {
     type Error = InvalidKey;
 
     fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if !c.is_ascii() {
-                return Err(InvalidKey::NotAscii);
-            }
-            if !c.is_alphanumeric() && c != '-' {
-                return Err(InvalidKey::NotAlphanumeric);
-            }
+        if !KEY.is_match(&value) {
+            return Err(InvalidKey);
         }
 
         Ok(Key { inner: value })
@@ -481,13 +512,8 @@ impl<'a> TryFrom<Cow<'a, str>> for Value<'a> {
     type Error = InvalidValue;
 
     fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if c.is_control() {
-                return Err(InvalidValue::ContainsControlCharacter);
-            }
-            if c == '\n' || c == '\r' {
-                return Err(InvalidValue::ContainsNewline);
-            }
+        if !VALUE.is_match(&value) {
+            return Err(InvalidValue);
         }
 
         Ok(Value { inner: value })
@@ -553,10 +579,8 @@ impl<'a> TryFrom<Cow<'a, str>> for Whitespace<'a> {
     type Error = InvalidWhitespace;
 
     fn try_from(value: Cow<'a, str>) -> Result<Self, Self::Error> {
-        for c in value.chars() {
-            if !c.is_ascii_whitespace() {
-                return Err(InvalidWhitespace);
-            }
+        if !WHITESPACE.is_match(&value) {
+            return Err(InvalidWhitespace);
         }
 
         Ok(Whitespace { inner: value })

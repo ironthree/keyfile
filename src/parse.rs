@@ -11,7 +11,7 @@ static HEADER: Lazy<Regex> = Lazy::new(|| {
     // - opening "[",
     // - printable ASCII characters except "[" and "]",
     // - closing "]"
-    Regex::new(r"^\[(?<name>[[:print:][^\[\]]]+)\]$").expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^\[(?<name>{})\]$", GROUPNAME_REGEX)).expect(REGEX_ERROR)
 });
 
 static KEY_VALUE_PAIR: Lazy<Regex> = Lazy::new(|| {
@@ -26,8 +26,8 @@ static KEY_VALUE_PAIR: Lazy<Regex> = Lazy::new(|| {
     // - opening "[",
     // - "<lang><_COUNTRY><.ENCODING><@MODIFIER>" (with all components except <lang> being optional),
     // - closing "]"
-    Regex::new(r"^(?<key>[[:alnum:]-]+)(?:\[(?<lang>[[:alpha:]]+)(?:_(?<country>[[:alpha:]]+))?(?:\.(?<encoding>[[:alnum:]-]+))?(?:@(?<modifier>[[:alpha:]]+))?\])?(?<wsl>[[:blank:]]*)=(?<wsr>[[:blank:]]*)(?<value>.*)$")
-        .expect("Failed to compile hard-coded regular expression.")
+    Regex::new(&format!(r"^(?<key>{KEY_REGEX})(?:\[(?<lang>{LANGUAGE_REGEX})(?:_(?<country>{COUNTRY_REGEX}))?(?:\.(?<encoding>{ENCODING_REGEX}))?(?:@(?<modifier>{MODIFIER_REGEX}))?\])?(?<wsl>{WHITESPACE_REGEX})=(?<wsr>{WHITESPACE_REGEX})(?<value>{VALUE_REGEX})$"))
+        .expect(REGEX_ERROR)
 });
 
 pub fn parse_as_header(line: &str) -> Option<&str> {
