@@ -3,6 +3,8 @@
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
 
+//! # KeyFile file format implementation
+
 mod keyfile;
 mod parse;
 pub mod types;

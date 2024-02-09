@@ -11,7 +11,7 @@ use crate::types::{
     KeyValuePair,
 };
 
-/// Error that is returned when attempting to parse an invalid KeyFile.
+/// Error that is returned when attempting to parse an invalid KeyFile
 #[derive(Debug, Error)]
 pub enum KeyFileError {
     /// Error variant for syntax errors.
@@ -42,7 +42,7 @@ impl KeyFileError {
     }
 }
 
-/// Struct representing a parsed KeyFile.
+/// Struct representing a parsed or manually constructed KeyFile
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
     pub(crate) groups: IndexMap<Cow<'a, str>, Group<'a>>,

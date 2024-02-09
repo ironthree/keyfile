@@ -1,4 +1,4 @@
-//! Implementations of the basic elements of KeyFiles
+//! ## Implementations of the fundamental data types of KeyFiles
 //!
 //! This includes wrapper types for strings that can only hold valid values by construction:
 //!
@@ -34,39 +34,16 @@ pub(crate) const MODIFIER_REGEX: &str = r"[[:alpha:]]+";
 pub(crate) const VALUE_REGEX: &str = r"[^[:cntrl:]]*";
 pub(crate) const WHITESPACE_REGEX: &str = r"[[:blank:]]*";
 
-static GROUPNAME: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{GROUPNAME_REGEX}$")).expect(REGEX_ERROR)
-});
+static GROUPNAME: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{GROUPNAME_REGEX}$")).expect(REGEX_ERROR));
+static KEY: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{KEY_REGEX}$")).expect(REGEX_ERROR));
+static LANGUAGE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{LANGUAGE_REGEX}$")).expect(REGEX_ERROR));
+static COUNTRY: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{COUNTRY_REGEX}$")).expect(REGEX_ERROR));
+static ENCODING: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{ENCODING_REGEX}$")).expect(REGEX_ERROR));
+static MODIFIER: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{MODIFIER_REGEX}$")).expect(REGEX_ERROR));
+static VALUE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{VALUE_REGEX}$")).expect(REGEX_ERROR));
+static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{WHITESPACE_REGEX}$")).expect(REGEX_ERROR));
 
-static KEY: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{KEY_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static LANGUAGE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{LANGUAGE_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static COUNTRY: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{COUNTRY_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static ENCODING: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{ENCODING_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static MODIFIER: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{MODIFIER_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static VALUE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{VALUE_REGEX}$")).expect(REGEX_ERROR)
-});
-
-static WHITESPACE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&format!(r"^{WHITESPACE_REGEX}$")).expect(REGEX_ERROR)
-});
-
-/// Newtype struct wrapping strings that are valid group names.
+/// ## Newtype struct wrapping strings that are valid group names
 ///
 /// New instances of `GroupName` can only be created from strings that are valid group names:
 ///
@@ -133,7 +110,7 @@ impl<'a> TryFrom<String> for GroupName<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid keys.
+/// ## Newtype struct wrapping strings that are valid keys
 ///
 /// New instances of `Key` can only be created from strings that are valid key names:
 ///
@@ -201,7 +178,7 @@ impl<'a> TryFrom<String> for Key<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid language identifiers.
+/// ## Newtype struct wrapping strings that are valid language identifiers
 ///
 /// New instances of `Language` can only be created from strings that are valid POSIX locale language identifiers:
 ///
@@ -268,9 +245,9 @@ impl<'a> TryFrom<String> for Language<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid country identifiers.
+/// ## Newtype struct wrapping strings that are valid country identifiers
 ///
-/// New instances of `Country` can only be created from strings that are valid POSIX locale country / terretory
+/// New instances of `Country` can only be created from strings that are valid POSIX locale country / territory
 /// identifiers:
 ///
 /// ```
@@ -336,7 +313,7 @@ impl<'a> TryFrom<String> for Country<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid encoding identifiers.
+/// ## Newtype struct wrapping strings that are valid encoding identifiers
 ///
 /// New instances of `Encoding` can only be created from strings that are valid POSIX locale encoding identifiers:
 ///
@@ -403,7 +380,7 @@ impl<'a> TryFrom<String> for Encoding<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid locale modifiers.
+/// ## Newtype struct wrapping strings that are valid locale modifiers
 ///
 /// New instances of `Encoding` can only be created from strings that are valid POSIX locale modifiers:
 ///
@@ -470,7 +447,7 @@ impl<'a> TryFrom<String> for Modifier<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid values.
+/// ## Newtype struct wrapping strings that are valid values
 ///
 /// New instances of `Value` can only be created from strings that are valid value strings:
 ///
@@ -536,7 +513,7 @@ impl<'a> TryFrom<String> for Value<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid whitespace.
+/// ## Newtype struct wrapping strings that are valid whitespace
 ///
 /// New instances of `Whitespace` can only be created from strings that are valid whitespace
 /// (i.e. spaces / tabs surrounding the `=` character in a key-value pair):
@@ -603,7 +580,7 @@ impl<'a> TryFrom<String> for Whitespace<'a> {
     }
 }
 
-/// Newtype struct wrapping strings that are valid comments and / or empty lines.
+/// ## Newtype struct wrapping strings that are valid comments and / or empty lines
 ///
 /// New instances of `Decor` can only be created from strings that are valid comment lines
 /// (a `#` character followed by an arbitrary string of UTF-8) or empty lines:
