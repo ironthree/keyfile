@@ -45,6 +45,9 @@ static ENCODING: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{ENCODING_REG
 static MODIFIER: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{MODIFIER_REGEX}$")).expect(REGEX_ERROR));
 static VALUE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{VALUE_REGEX}$")).expect(REGEX_ERROR));
 static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{WHITESPACE_REGEX}$")).expect(REGEX_ERROR));
+static LOCALE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&format!(r"(?<lang>{LANGUAGE_REGEX})(?:_(?<country>{COUNTRY_REGEX}))?(?:\.(?<encoding>{ENCODING_REGEX}))?(?:@(?<modifier>{MODIFIER_REGEX}))?")).expect(REGEX_ERROR)
+});
 
 /// ## Error that is returned when attempting to initialize a type with an invalid input for that type
 ///
@@ -53,33 +56,36 @@ static WHITESPACE: Lazy<Regex> = Lazy::new(|| Regex::new(&format!(r"^{WHITESPACE
 /// of this error.
 #[derive(Debug, thiserror::Error)]
 pub enum InvalidString {
-    /// An invalid string was passed to [`GroupName::try_from`]
+    /// An invalid string was passed to [`GroupName::try_from`].
     #[error("Invalid group name: may only contain printable ASCII, except for the '[' and ']' characters")]
     GroupName,
-    /// An invalid string was passed to [`Key::try_from`]
+    /// An invalid string was passed to [`Key::try_from`].
     #[error("Invalid key name: may only contain alphanumeric ASCII characters and the '-' character")]
     Key,
-    /// An invalid string was passed to [`Language::try_from`]
+    /// An invalid string was passed to [`Language::try_from`].
     #[error("Invalid lanugage: may only contain alphabetic ASCII characters")]
     Language,
-    /// An invalid string was passed to [`Country::try_from`]
+    /// An invalid string was passed to [`Country::try_from`].
     #[error("Invalid country: may only contaun alphabetic ASCII characters")]
     Country,
-    /// An invalid string was passed to [`Encoding::try_from`]
+    /// An invalid string was passed to [`Encoding::try_from`].
     #[error("Invalid encoding: may only contain alphanumeric ASCII characters and the '-' character")]
     Encoding,
-    /// An invalid string was passed to [`Modifier::try_from`]
+    /// An invalid string was passed to [`Modifier::try_from`].
     #[error("Invalid modifier: may only contain alphabetic ASCII characters")]
     Modifier,
-    /// An invalid string was passed to [`Value::try_from`]
+    /// An invalid string was passed to [`Value::try_from`].
     #[error("Invalid value: may not contain control characters")]
     Value,
-    /// An invalid string was passed to [`Whitespace::try_from`]
+    /// An invalid string was passed to [`Whitespace::try_from`].
     #[error("Invalid whitespace: may only contain space (' ') or tab ('\t')")]
     Whitespace,
-    /// An invalid list of strings was passed to [`Decor::try_from`]
+    /// An invalid list of strings was passed to [`Decor::try_from`].
     #[error("Invalid decor: may only contain empty strings or strings that start with the '#' character")]
     Decor,
+    /// An invalid string was passed to [`Locale::try_from`].
+    #[error("Invalid locale: unrecognized format")]
+    Locale,
 }
 
 /// ## Newtype struct wrapping strings that are valid group names
@@ -92,6 +98,9 @@ pub enum InvalidString {
 /// let group = GroupName::try_from("hello").unwrap();
 /// let error = GroupName::try_from("[[[[[").unwrap_err();
 /// ```
+///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
 ///
 /// The inner string can always be obtained by using the [`From::from`] method:
 ///
@@ -159,6 +168,9 @@ impl<'a> TryFrom<String> for GroupName<'a> {
 /// let key = Key::try_from("hello").unwrap();
 /// let error = Key::try_from("//!!/").unwrap_err();
 /// ```
+///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
 ///
 /// The inner string can always be obtained by using the [`From::from`] method:
 ///
@@ -228,6 +240,9 @@ impl<'a> TryFrom<String> for Key<'a> {
 /// let error = Language::try_from("42").unwrap_err();
 /// ```
 ///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
+///
 /// The inner string can always be obtained by using the [`From::from`] method:
 ///
 /// ```
@@ -296,6 +311,9 @@ impl<'a> TryFrom<String> for Language<'a> {
 /// let error = Country::try_from("!!").unwrap_err();
 /// ```
 ///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
+///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
 /// ```
@@ -362,6 +380,9 @@ impl<'a> TryFrom<String> for Country<'a> {
 /// let encoding = Encoding::try_from("utf8").unwrap();
 /// let error = Encoding::try_from("morse!").unwrap_err();
 /// ```
+///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
 ///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
@@ -430,6 +451,9 @@ impl<'a> TryFrom<String> for Encoding<'a> {
 /// let error = Modifier::try_from("!foo!").unwrap_err();
 /// ```
 ///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
+///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
 /// ```
@@ -496,6 +520,9 @@ impl<'a> TryFrom<String> for Modifier<'a> {
 /// let value = Value::try_from("WORLD").unwrap();
 /// let error = Value::try_from("new\nline").unwrap_err();
 /// ```
+///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
 ///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
@@ -564,6 +591,9 @@ impl<'a> TryFrom<String> for Value<'a> {
 /// let error = Whitespace::try_from("HELLO").unwrap_err();
 /// ```
 ///
+/// The [`TryFrom`] trait is implemented for [`String`], [`&str`], and [`Cow<str>`]. All values are stored as
+/// [`Cow<str>`] values internally.
+///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
 /// ```
@@ -631,6 +661,9 @@ impl<'a> TryFrom<String> for Whitespace<'a> {
 /// let error = Decor::try_from(vec!["This=is not a comment"]).unwrap_err();
 /// ```
 ///
+/// The [`TryFrom`] trait is implemented for [`Vec<String>`], [`Vec<&str>`], and [`Vec<Cow<str>>`]. All values are
+/// stored as [`Vec<Cow<str>>`] values internally.
+///
 /// The contained string can always be obtained by using the [`From::from`] method:
 ///
 /// ```
@@ -691,12 +724,39 @@ impl<'a> TryFrom<Vec<String>> for Decor<'a> {
 /// ## Locale identifier (language, country / territory, encoding, and modifier)
 ///
 /// This struct represents a locale identifier as used on UNIX / POSIX systems.
+///
+/// This type contains a non-optional [`Language`], and optional [`Country`], [`Encoding`], and [`Modifier`], which
+/// are all stored as [`Cow<str>`] internally to avoid copying strings unless necessary.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Locale<'a> {
     pub(crate) lang: Cow<'a, str>,
     pub(crate) country: Option<Cow<'a, str>>,
     pub(crate) encoding: Option<Cow<'a, str>>,
     pub(crate) modifier: Option<Cow<'a, str>>,
+}
+
+impl<'a> TryFrom<&'a str> for Locale<'a> {
+    type Error = InvalidString;
+
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
+        let Some(caps) = LOCALE.captures(value) else {
+            return Err(InvalidString::Locale);
+        };
+
+        let Some(lang) = caps.name("lang").map(|m| m.as_str()) else {
+            return Err(InvalidString::Locale);
+        };
+        let country = caps.name("country").map(|m| m.as_str());
+        let encoding = caps.name("encoding").map(|m| m.as_str());
+        let modifier = caps.name("modifier").map(|m| m.as_str());
+
+        Ok(Locale::new_with_encoding(
+            Language::new_unchecked(Cow::Borrowed(lang)),
+            country.map(|c| Country::new_unchecked(Cow::Borrowed(c))),
+            encoding.map(|e| Encoding::new_unchecked(Cow::Borrowed(e))),
+            modifier.map(|m| Modifier::new_unchecked(Cow::Borrowed(m))),
+        ))
+    }
 }
 
 impl<'a> Locale<'a> {
@@ -724,8 +784,10 @@ impl<'a> Locale<'a> {
         }
     }
 
-    /// Method for converting a [`Locale`] that possibly references borrowed data into
-    /// a [`Locale`] with a `'static` lifetime
+    /// ### Method for converting a `Locale<'a>` into a `Locale<'static>`
+    ///
+    /// This is a "deep copy" which converts any [`Cow::Borrowed`] into [`Cow::Owned`] by copying the underlying string
+    /// into a new "owned" value.
     pub fn into_owned(self) -> Locale<'static> {
         Locale {
             lang: Cow::Owned(self.lang.into_owned()),
@@ -740,7 +802,7 @@ impl<'a> Locale<'a> {
         &self.lang
     }
 
-    /// Method for setting the language identifier
+    /// ### Method for setting the language identifier
     ///
     /// The replaced string is returned.
     pub fn set_lang<'l: 'a>(&mut self, lang: Language<'l>) -> Cow<str> {
@@ -752,7 +814,7 @@ impl<'a> Locale<'a> {
         self.country.as_deref()
     }
 
-    /// Method for getting the country / territory identifier
+    /// ### Method for getting the country / territory identifier
     ///
     /// If this method replaces an existing identifier, it is returned.
     pub fn set_country<'c: 'a>(&mut self, country: Option<Country<'c>>) -> Option<Cow<str>> {
@@ -769,7 +831,7 @@ impl<'a> Locale<'a> {
         self.modifier.as_deref()
     }
 
-    /// Method for setting the locale modifier
+    /// ### Method for setting the locale modifier
     ///
     /// If this method replaces an existing modifier, it is returned.
     pub fn set_modifier<'m: 'a>(&mut self, modifier: Option<Modifier<'m>>) -> Option<Cow<str>> {

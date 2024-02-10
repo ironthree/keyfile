@@ -13,6 +13,7 @@
 
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Display};
+use std::str::FromStr;
 
 use indexmap::IndexMap;
 use thiserror::Error;
@@ -23,7 +24,15 @@ use crate::types::*;
 #[cfg(doc)]
 use crate::types;
 
-/// Error that is returned when attempting to parse an invalid KeyFile
+/// ### Error that is returned when attempting to parse an invalid KeyFile
+///
+/// This error can be caused by various issues in the input string:
+///
+/// - syntax errors (i.e. lines that are neither a valid group header, a valid key-value pair, a comment, or empty)
+/// - invalid content (more than one group with the same name, or more than one key-value pair with the same key in the
+///   same group)
+/// - violations of other invariants (for example, if a key with a locale specifier is present within a group, then the
+///   same key *without* a locale specifier must also be present)
 #[derive(Debug, Error)]
 pub enum KeyFileError {
     /// Error variant for syntax errors.
@@ -38,6 +47,7 @@ pub enum KeyFileError {
     #[error("Multiple key-value pairs with the same key (line {}): {}", .lineno, .key)]
     #[allow(missing_docs)]
     DuplicateKey { key: String, lineno: usize },
+    // error variant for missing locale-less key
 }
 
 impl KeyFileError {
@@ -54,7 +64,25 @@ impl KeyFileError {
     }
 }
 
-/// Struct representing a parsed or manually constructed KeyFile
+/// ### Data structure representing the contents of a KeyFile
+///
+/// A KeyFile contains multiple named groups of key-value pairs, i.e. provides a two-level mapping.
+///
+/// Any trailing empty lines or comment lines ("decor") that occur after the last group / key-value pair are assumed to
+/// be associated with the top-level keyfile itself, and are preserved across edits.
+///
+/// Two methods are provided for parsing a string as a [`KeyFile`]:
+///
+/// - [`KeyFile::parse`] parses the input string into a [`KeyFile`] without copying any parts of the input string
+///   ("zero-copy") and returns a [`KeyFile`] with a lifetime that is tied to the lifetime of the input string
+/// - [`str::parse`] parses the input string into a [`KeyFile`] *and* copies strings as necessary to return an "owned"
+///   [`KeyFile`] with a `'static` lifetime
+///
+/// The second method is equivalent to calling [`KeyFile::parse`] first and then calling [`KeyFile::into_owned`] on the
+/// result, and is privoded for convenience.
+///
+/// A [`KeyFile`] can also be constructed programmatically by initializing an empty keyfile with [`KeyFile::new`] and
+/// then inserting groups with [`KeyFile::insert_group`].
 #[derive(Clone, Debug, Default)]
 pub struct KeyFile<'a> {
     pub(crate) groups: IndexMap<Cow<'a, str>, Group<'a>>,
@@ -62,7 +90,7 @@ pub struct KeyFile<'a> {
 }
 
 impl<'a> KeyFile<'a> {
-    /// Method for creating a new and empty [`KeyFile`].
+    /// Method for creating a new and empty [`KeyFile`]
     pub fn new() -> Self {
         KeyFile {
             groups: IndexMap::new(),
@@ -70,7 +98,10 @@ impl<'a> KeyFile<'a> {
         }
     }
 
-    /// Method for parsing a string into a [`KeyFile`].
+    /// ### Method for parsing a string into a [`KeyFile`]
+    ///
+    /// This method does not copy any part of the input string and returns a value whose lifetime is tied to the
+    /// lifetime of the input string.
     pub fn parse(value: &'a str) -> Result<Self, KeyFileError> {
         let mut current_group: Option<Group> = None;
 
@@ -90,6 +121,8 @@ impl<'a> KeyFile<'a> {
                 }
                 if let Some(collector) = current_group.take() {
                     // this clone is cheap since collector.name is always a Cow::Borrowed
+                    // TODO: validate that when inserting the "finished" group, there is a locale-less key-value-pair
+                    // for every locale-ful key-value-pair
                     groups.insert(collector.name.clone(), collector);
                     // already checked if there was a previous group with this name
                 }
@@ -108,7 +141,7 @@ impl<'a> KeyFile<'a> {
                         key.to_string()
                     };
 
-                    let kv = KeyValuePair::new_with_decor(
+                    let kv = KeyValuePair::from_fields(
                         Key::new_unchecked(key.into()),
                         // this clone is cheap since locale contains only Cow::Borrowed
                         locale.clone(),
@@ -130,6 +163,8 @@ impl<'a> KeyFile<'a> {
 
         if let Some(collector) = current_group.take() {
             // this clone is cheap since collector.name is always a Cow::Borrowed
+            // TODO: validate that when inserting the "finished" group, there is a locale-less key-value-pair for every
+            // locale-ful key-value-pair
             groups.insert(collector.name.clone(), collector);
             // already checked if there was a previous group with this name
         }
@@ -137,8 +172,10 @@ impl<'a> KeyFile<'a> {
         Ok(KeyFile { groups, decor })
     }
 
-    /// Method for converting a [`KeyFile`] that possibly references borrowed data into
-    /// a [`KeyFile`] with a `'static` lifetime.
+    /// ### Method for converting a `KeyFile<'a>` into a `KeyFile<'static>`
+    ///
+    /// This is a "deep copy" which converts any [`Cow::Borrowed`] into [`Cow::Owned`] by copying the underlying string
+    /// into a new "owned" value.
     pub fn into_owned(self) -> KeyFile<'static> {
         let mut owned = KeyFile::new();
 
@@ -153,21 +190,21 @@ impl<'a> KeyFile<'a> {
         owned
     }
 
-    /// Method for getting a reference to the [`Group`] with the given name.
+    /// ### Method for getting a reference to the [`Group`] with the given name
     ///
     /// If there is no group with the given name, then [`None`] is returned.
     pub fn get_group(&self, name: &str) -> Option<&Group> {
         self.groups.get(name)
     }
 
-    /// Method for getting a mutable reference to the [`Group`] with the given name.
+    /// ### Method for getting a mutable reference to the [`Group`] with the given name
     ///
     /// If there is no group with the given name, then [`None`] is returned.
     pub fn get_group_mut(&'a mut self, name: &str) -> Option<&mut Group> {
         self.groups.get_mut(name)
     }
 
-    /// Method for inserting a new [`Group`] into the [`KeyFile`].
+    /// ### Method for inserting a new [`Group`] into the [`KeyFile`]
     ///
     /// The group will be appended as the last group in the [`KeyFile`].
     ///
@@ -179,7 +216,7 @@ impl<'a> KeyFile<'a> {
         self.groups.insert(group.name.clone(), group)
     }
 
-    /// Method for removing a [`Group`] with the given name.
+    /// ### Method for removing a [`Group`] with the given name
     ///
     /// If there is no group with the given name, then [`None`] is returned.
     ///
@@ -203,10 +240,26 @@ impl<'a> Display for KeyFile<'a> {
     }
 }
 
+impl<'a> FromStr for KeyFile<'a> {
+    type Err = KeyFileError;
+
+    /// ### Parse a string into a [`KeyFile`]
+    ///
+    /// *Note*: This method performs a "deep copy" of all string references in order to return a [`KeyFile`] with a
+    /// `'static` lifetime. When this is not required, the [`KeyFile::parse`] method only performs zero-copy parsing,
+    /// but returns a [`KeyFile`] whose lifetime is bound to the lifetime of the input string.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        KeyFile::parse(s).map(KeyFile::into_owned)
+    }
+}
+
 /// ## Key-value pair and its associated data
 ///
-/// This includes format-preserving representations of preceding comment lines, empty lines,
-/// and whitespace around the `=` separator character.
+/// Key-value pairs ("entries") are mappings from "keys" to "values", where keys can optionally contain a locale
+/// specifier to provide a translated version of a value for a given key.
+///
+/// Any empty lines or comment lines ("decor") that precede the key-value pair are assumed to be associated with the
+/// key-value pair, and are preserved across edits. Whitespace around the `=` separator character is preserved as well.
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyValuePair<'a> {
     pub(crate) key: Cow<'a, str>,
@@ -218,11 +271,15 @@ pub struct KeyValuePair<'a> {
 }
 
 impl<'a> KeyValuePair<'a> {
-    /// Method to construct a new plain key-value pair
-    pub fn new<'kv: 'a>(key: Key<'kv>, locale: Option<Locale<'kv>>, value: Value<'kv>) -> Self {
+    /// ### Method to construct a new plain [`KeyValuePair`]
+    ///
+    /// This method returns a new key-value pair that has only the plain key and values set, but no locale specifier,
+    /// associated comments or preceding empty lines. The whitespace around the `=` is set to the default value, a
+    /// single ASCII space character.
+    pub fn new<'kv: 'a>(key: Key<'kv>, value: Value<'kv>) -> Self {
         KeyValuePair {
             key: key.into(),
-            locale,
+            locale: None,
             value: value.into(),
             wsl: " ".into(),
             wsr: " ".into(),
@@ -230,8 +287,52 @@ impl<'a> KeyValuePair<'a> {
         }
     }
 
-    /// Method to construct a new key-value pair with explicitly set whitespace and decor
-    pub fn new_with_decor<'kv: 'a>(
+    /// ### Method to construct a new [`KeyValuePair`] with a translated value
+    ///
+    /// This method is equlvaient to [`KeyValuePair::new`] except that it also allows setting the locale specifier (for
+    /// providing a translated values for an existing key-value pair).
+    pub fn new_with_locale<'kv: 'a>(key: Key<'kv>, locale: Locale<'kv>, value: Value<'kv>) -> Self {
+        KeyValuePair {
+            key: key.into(),
+            locale: Some(locale),
+            value: value.into(),
+            wsl: " ".into(),
+            wsr: " ".into(),
+            decor: Vec::new(),
+        }
+    }
+
+    /// ### Method to construct a new [`KeyValuePair`] that allows setting all fields explicitly
+    ///
+    /// This method is equivalent to calling [`KeyValuePair::new`] and then using the "setter" methods to set the
+    /// remaining fields:
+    ///
+    /// ```
+    /// use keyfile::{types::*, KeyValuePair};
+    ///
+    /// let mut kv1 = KeyValuePair::new(
+    ///     Key::try_from("Hello").unwrap(),
+    ///     Value::try_from("World").unwrap(),
+    /// );
+    /// kv1.set_locale(Some(Locale::try_from("de").unwrap()));
+    /// kv1.set_whitespace(
+    ///     Whitespace::try_from("\t").unwrap(),
+    ///     Whitespace::try_from("\t").unwrap(),
+    /// );
+    /// kv1.set_decor(Decor::try_from(vec!["# This is a comment"]).unwrap());
+    ///
+    /// let kv2 = KeyValuePair::from_fields(
+    ///     Key::try_from("Hello").unwrap(),
+    ///     Some(Locale::try_from("de").unwrap()),
+    ///     Value::try_from("World").unwrap(),
+    ///     Whitespace::try_from("\t").unwrap(),
+    ///     Whitespace::try_from("\t").unwrap(),
+    ///     Decor::try_from(vec!["# This is a comment"]).unwrap(),
+    /// );
+    ///
+    /// assert_eq!(kv1, kv2);
+    /// ```
+    pub fn from_fields<'kv: 'a>(
         key: Key<'kv>,
         locale: Option<Locale<'kv>>,
         value: Value<'kv>,
@@ -249,8 +350,10 @@ impl<'a> KeyValuePair<'a> {
         }
     }
 
-    /// Method for converting a [`KeyValuePair`] that possibly references borrowed data into
-    /// a [`KeyValuePair`] with a `'static` lifetime
+    /// ### Method for converting a `KeyValuePair<'a>` into a `KeyValuePair<'static>`
+    ///
+    /// This is a "deep copy" which converts any [`Cow::Borrowed`] into [`Cow::Owned`] by copying the underlying string
+    /// into a new "owned" value.
     pub fn into_owned(self) -> KeyValuePair<'static> {
         let owned_decor = self.decor.into_iter().map(|c| Cow::Owned(c.into_owned())).collect();
 
@@ -269,7 +372,7 @@ impl<'a> KeyValuePair<'a> {
         &self.key
     }
 
-    /// Method for setting the key string
+    /// ### Method for setting the key string
     ///
     /// The replaced key string is returned.
     pub fn set_key<'k: 'a>(&mut self, key: Key<'k>) -> Cow<str> {
@@ -281,11 +384,11 @@ impl<'a> KeyValuePair<'a> {
         self.locale.as_ref()
     }
 
-    /// Method for setting the optional locale string
+    /// ### Method for setting the optional locale string
     ///
     /// If this method replaces an existing locale string, it is returned.
-    pub fn set_locale<'l: 'a>(&mut self, locale: Locale<'l>) -> Option<Locale<'a>> {
-        std::mem::replace(&mut self.locale, Some(locale))
+    pub fn set_locale<'l: 'a>(&mut self, locale: Option<Locale<'l>>) -> Option<Locale<'a>> {
+        std::mem::replace(&mut self.locale, locale)
     }
 
     /// Method for getting the value string
@@ -293,7 +396,7 @@ impl<'a> KeyValuePair<'a> {
         &self.value
     }
 
-    /// Method for setting the value string
+    /// ### Method for setting the value string
     ///
     /// The replaced value string is returned.
     pub fn set_value<'v: 'a>(&mut self, value: Value<'v>) -> Cow<str> {
@@ -305,7 +408,7 @@ impl<'a> KeyValuePair<'a> {
         (&self.wsl, &self.wsr)
     }
 
-    /// Method for setting the whitespace surrounding the `=` separator
+    /// ### Method for setting the whitespace surrounding the `=` separator
     ///
     /// The replaced strings are returned.
     pub fn set_whitespace<'w: 'a>(&mut self, wsl: Whitespace<'w>, wsr: Whitespace<'w>) -> (Cow<str>, Cow<str>) {
@@ -315,12 +418,12 @@ impl<'a> KeyValuePair<'a> {
         )
     }
 
-    /// Method for getting the comment lines / empty lines preceding the [`KeyValuePair`]
+    /// Method for getting the comments / empty lines preceding the [`KeyValuePair`]
     pub fn get_decor(&self) -> &[Cow<str>] {
         self.decor.as_slice()
     }
 
-    /// Method for setting the comment lines / empty lines preceding the [`KeyValuePair`]
+    /// ### Method for setting the commens / empty lines preceding the [`KeyValuePair`]
     ///
     /// The replaced strings are returned.
     pub fn set_decor<'d: 'a>(&mut self, decor: Decor<'d>) -> Vec<Cow<str>> {
@@ -346,7 +449,12 @@ impl<'a> Display for KeyValuePair<'a> {
 
 /// ## Named group of key-value pairs and its associated data
 ///
-/// This includes a format-preserving representation of preceding comment lines and empty lines.
+/// Groups are "named" collection of key-value pairs ("entries"). A group begins with a "header"
+/// line in the format of `[{group_name}]`, followed by key-value pairs, and terminated by either
+/// another group header or the end of the string.
+///
+/// Any empty lines or comment lines ("decor") that precede the opening group header are assumed to be associated with
+/// the group as well, and are preserved across edits
 #[derive(Clone, Debug)]
 pub struct Group<'a> {
     pub(crate) name: Cow<'a, str>,
@@ -355,7 +463,10 @@ pub struct Group<'a> {
 }
 
 impl<'a> Group<'a> {
-    /// Method for creating a new and empty [`Group`]
+    /// ### Method for creating a new and empty [`Group`]
+    ///
+    /// This method returns a new group that only has its name set, but no key-value pairs ("entries") or associated
+    /// comments or preceding empty lines.
     pub fn new<'e: 'a>(name: GroupName<'e>) -> Self {
         Group {
             name: name.into(),
@@ -376,8 +487,10 @@ impl<'a> Group<'a> {
         }
     }
 
-    /// Method for converting a [`Group`] that possibly references borrowed data into
-    /// a [`Group`] with a `'static` lifetime
+    /// ### Method for converting a `Group<'a>` into a `Group<'static>`
+    ///
+    /// This is a "deep copy" which converts any [`Cow::Borrowed`] into [`Cow::Owned`] by copying the
+    /// underlying string into a new "owned" value.
     pub fn into_owned(self) -> Group<'static> {
         let owned_name: Cow<'static, str> = Cow::Owned(self.name.into_owned());
 
@@ -394,21 +507,21 @@ impl<'a> Group<'a> {
         owned
     }
 
-    /// Method for getting a reference to the [`KeyValuePair`] associated with the given key
+    /// ### Method for getting a reference to the [`KeyValuePair`] associated with the given key
     ///
     /// If there is no key-value pair associated with the given key, then [`None`] is returned.
     pub fn get<'k: 'a>(&self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&KeyValuePair> {
         self.entries.get(&(key.into(), locale))
     }
 
-    /// Method for getting a mutable reference to the [`KeyValuePair`] associated with the given key
+    /// ### Method for getting a mutable reference to the [`KeyValuePair`] associated with the given key
     ///
     /// If there is no key-value pair associated with the given key, then [`None`] is returned.
     pub fn get_mut<'k: 'a>(&'a mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&mut KeyValuePair> {
         self.entries.get_mut(&(key.into(), locale))
     }
 
-    /// Method for inserting a new [`KeyValuePair`] into the [`Group`]
+    /// ### Method for inserting a new [`KeyValuePair`] into the [`Group`]
     ///
     /// The key-value pair will be appended as the last entry in the [`Group`].
     ///
@@ -420,11 +533,11 @@ impl<'a> Group<'a> {
         self.entries.insert((kv.key.clone(), kv.locale.clone()), kv)
     }
 
-    /// Method for removing a [`KeyValuePair`] associated with the given key
+    /// ### Method for removing a [`KeyValuePair`] associated with the given key
     ///
     /// If there is no key-value pair associated with the given key, then [`None`] is returned.
     ///
-    /// This operation preserves the order of remaining key-value pairs.
+    /// This operation preserves the order of the remaining key-value pairs.
     pub fn remove<'k: 'a>(&mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<KeyValuePair> {
         self.entries.shift_remove(&(key.into(), locale))
     }

@@ -3,7 +3,7 @@
 use keyfile::{Group, KeyFile, KeyValuePair};
 
 fn main() -> anyhow::Result<()> {
-    let kv1 = KeyValuePair::new_with_decor(
+    let kv1 = KeyValuePair::from_fields(
         "Name".try_into()?,
         None,
         "Test".try_into()?,
@@ -11,7 +11,7 @@ fn main() -> anyhow::Result<()> {
         "\t".try_into()?,
         vec!["# This is a Test Name"].try_into()?,
     );
-    let kv2 = KeyValuePair::new("Version".try_into()?, None, "1.5".try_into()?);
+    let kv2 = KeyValuePair::new("Version".try_into()?, "1.5".try_into()?);
 
     let mut group = Group::new("Desktop Entry".try_into()?);
     group.insert(kv1);
