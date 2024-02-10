@@ -38,6 +38,14 @@
 //! let owned: KeyFile<'static> = borrowed.into_owned();
 //! ```
 //!
+//! ## Limitations
+//!
+//! This crate only supports parsing and writing UTF-8 encoded KeyFiles. The spec technically supports key-value pairs
+//! where values use encodings other than UTF-8 (by using the "encoding" modifier in the locale), but KeyFiles
+//! themselves are supposed to be UTF-8 encoded. Hence, all values are parsed as UTF-8, even if the "encoding" specifier
+//! is set to a different encoding, and it is not possible to programmatically create new key-value pairs that set the
+//! "encoding" modifier.
+//!
 //! [Desktop Entry Specification]: https://specifications.freedesktop.org/desktop-entry-spec/latest/
 //! [Glib.KeyFile]: https://docs.gtk.org/glib/struct.KeyFile.html
 

@@ -579,6 +579,38 @@ impl<'a> TryFrom<String> for Value<'a> {
     }
 }
 
+impl From<bool> for Value<'static> {
+    fn from(value: bool) -> Self {
+        match value {
+            true => Value::new_unchecked(Cow::Borrowed("true")),
+            false => Value::new_unchecked(Cow::Borrowed("false")),
+        }
+    }
+}
+
+macro_rules! impl_from_for_value {
+    ($t:ty) => {
+        impl From<$t> for Value<'static> {
+            fn from(value: $t) -> Self {
+                Value::new_unchecked(Cow::Owned(value.to_string()))
+            }
+        }
+    }
+}
+
+impl_from_for_value!(i8);
+impl_from_for_value!(i16);
+impl_from_for_value!(i32);
+impl_from_for_value!(i64);
+
+impl_from_for_value!(u8);
+impl_from_for_value!(u16);
+impl_from_for_value!(u32);
+impl_from_for_value!(u64);
+
+impl_from_for_value!(f32);
+impl_from_for_value!(f64);
+
 /// ## Newtype struct wrapping strings that are valid whitespace
 ///
 /// New instances of `Whitespace` can only be created from strings that are valid whitespace
