@@ -746,9 +746,16 @@ impl<'a> TryFrom<&'a str> for Locale<'a> {
         let Some(lang) = caps.name("lang").map(|m| m.as_str()) else {
             return Err(InvalidString::Locale);
         };
+
         let country = caps.name("country").map(|m| m.as_str());
         let encoding = caps.name("encoding").map(|m| m.as_str());
         let modifier = caps.name("modifier").map(|m| m.as_str());
+
+        if encoding.is_some() {
+            // This is an error: Constructing an encoding modifier is not supported since only UTF-8 encoded strings
+            // can be set as values, so no valid value could be set for a KeyValuePair with this Locale set.
+            return Err(InvalidString::Encoding);
+        }
 
         Ok(Locale::new_with_encoding(
             Language::new_unchecked(Cow::Borrowed(lang)),
