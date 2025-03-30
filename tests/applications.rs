@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use glob::glob;
 
 use keyfile::KeyFile;
@@ -7,8 +9,8 @@ fn parse_all() -> anyhow::Result<()> {
     let files = glob("/usr/share/applications/*.desktop")?;
 
     let ignored = [
-        "/usr/share/applications/firefox.desktop", // invalid locale: "ja_JP-mac"
         "/usr/share/applications/org.fedoraproject.MediaWriter.desktop", // invalid locale: "pt-BR"
+        "/usr/share/applications/org.mozilla.firefox.desktop", // invalid locale: "ja_JP-mac"
         "/usr/share/applications/gnome-wifi-panel.desktop", // invalid control character in Keywords[el]: "\t"
     ];
 

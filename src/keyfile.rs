@@ -200,7 +200,7 @@ impl<'a> KeyFile<'a> {
     /// ### Method for getting a mutable reference to the [`Group`] with the given name
     ///
     /// If there is no group with the given name, then [`None`] is returned.
-    pub fn get_group_mut(&'a mut self, name: &str) -> Option<&mut Group> {
+    pub fn get_group_mut(&'a mut self, name: &str) -> Option<&'a mut Group<'a>> {
         self.groups.get_mut(name)
     }
 
@@ -291,7 +291,7 @@ impl<'a> KeyValuePair<'a> {
     ///
     /// This method is equlvaient to [`KeyValuePair::new`] except that it also allows setting the locale specifier (for
     /// providing a translated values for an existing key-value pair).
-    pub fn new_with_locale<'kv: 'a>(key: Key<'kv>, locale: Locale<'kv>, value: Value<'kv>) -> Self {
+    pub fn new_with_locale<'kv: 'a, V>(key: Key<'kv>, locale: Locale<'kv>, value: Value<'kv>) -> Self {
         KeyValuePair {
             key: key.into(),
             locale: Some(locale),
@@ -517,7 +517,7 @@ impl<'a> Group<'a> {
     /// ### Method for getting a mutable reference to the [`KeyValuePair`] associated with the given key
     ///
     /// If there is no key-value pair associated with the given key, then [`None`] is returned.
-    pub fn get_mut<'k: 'a>(&'a mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&mut KeyValuePair> {
+    pub fn get_mut<'k: 'a>(&'a mut self, key: &'k str, locale: Option<Locale<'k>>) -> Option<&'a mut KeyValuePair<'a>> {
         self.entries.get_mut(&(key.into(), locale))
     }
 
